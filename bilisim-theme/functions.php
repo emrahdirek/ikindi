@@ -13,8 +13,8 @@ function bilisim_setup() {
 add_action('after_setup_theme', 'bilisim_setup');
 
 function bilisim_scripts() {
-  wp_enqueue_style('bilisim-fonts', 'https://fonts.googleapis.com/css2?family=Syne:wght@700;800;900&family=Inter:wght@400;500;600;700&display=swap', [], null);
-  wp_enqueue_style('bilisim-style', get_template_directory_uri() . '/assets/css/style.css', ['bilisim-fonts'], '2.0.0');
+  wp_enqueue_style('bilisim-fonts', 'https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@700;800;900&family=Inter:wght@400;500;600;700&display=swap', [], null);
+  wp_enqueue_style('bilisim-style', get_template_directory_uri() . '/assets/css/style.css', ['bilisim-fonts'], '3.0.0');
   wp_enqueue_script('bilisim-main', get_template_directory_uri() . '/assets/js/main.js', [], '2.0.0', true);
 }
 add_action('wp_enqueue_scripts', 'bilisim_scripts');
