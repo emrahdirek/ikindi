@@ -3,76 +3,53 @@ defined('ABSPATH') || exit;
 
 require_once get_template_directory() . '/inc/walkers.php';
 
-/* =====================
-   THEME SETUP
-===================== */
 function bilisim_setup() {
-    add_theme_support('title-tag');
-    add_theme_support('post-thumbnails');
-    add_theme_support('html5', ['search-form','comment-form','comment-list','gallery','caption','style','script']);
-    add_theme_support('custom-logo');
-    add_theme_support('menus');
-
-    register_nav_menus([
-        'primary'  => __('Ana Menü', 'bilisim-koleji'),
-        'topbar'   => __('Üst Bar Menü', 'bilisim-koleji'),
-        'footer'   => __('Footer Menü', 'bilisim-koleji'),
-    ]);
-
-    load_theme_textdomain('bilisim-koleji', get_template_directory() . '/languages');
+  add_theme_support('title-tag');
+  add_theme_support('post-thumbnails');
+  add_theme_support('html5', ['search-form','comment-form','comment-list','gallery','caption','style','script']);
+  add_theme_support('custom-logo');
+  register_nav_menus(['primary' => 'Ana Menü', 'footer' => 'Footer Menü']);
 }
 add_action('after_setup_theme', 'bilisim_setup');
 
-/* =====================
-   ENQUEUE ASSETS
-===================== */
 function bilisim_scripts() {
-    wp_enqueue_style(
-        'bilisim-google-fonts',
-        'https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700;800;900&family=Inter:wght@400;500;600&display=swap',
-        [],
-        null
-    );
-    wp_enqueue_style(
-        'bilisim-main',
-        get_template_directory_uri() . '/assets/css/style.css',
-        ['bilisim-google-fonts'],
-        '1.0.0'
-    );
-    wp_enqueue_script(
-        'bilisim-main',
-        get_template_directory_uri() . '/assets/js/main.js',
-        [],
-        '1.0.0',
-        true
-    );
-    wp_localize_script('bilisim-main', 'bilisimData', [
-        'ajaxUrl' => admin_url('admin-ajax.php'),
-        'nonce'   => wp_create_nonce('bilisim_nonce'),
-    ]);
+  wp_enqueue_style('bilisim-fonts', 'https://fonts.googleapis.com/css2?family=Syne:wght@700;800;900&family=Inter:wght@400;500;600;700&display=swap', [], null);
+  wp_enqueue_style('bilisim-style', get_template_directory_uri() . '/assets/css/style.css', ['bilisim-fonts'], '2.0.0');
+  wp_enqueue_script('bilisim-main', get_template_directory_uri() . '/assets/js/main.js', [], '2.0.0', true);
 }
 add_action('wp_enqueue_scripts', 'bilisim_scripts');
 
-/* =====================
-   CUSTOM EXCERPT LENGTH
-===================== */
-function bilisim_excerpt_length() { return 20; }
-add_filter('excerpt_length', 'bilisim_excerpt_length');
+/* Remove ALL WordPress fingerprints */
+remove_action('wp_head', 'wp_generator');
+remove_action('wp_head', 'wlwmanifest_link');
+remove_action('wp_head', 'rsd_link');
+remove_action('wp_head', 'wp_shortlink_wp_head');
+remove_action('wp_head', 'adjacent_posts_rel_link_wp_head');
+remove_action('wp_head', 'print_emoji_detection_script', 7);
+remove_action('wp_print_styles', 'print_emoji_styles');
+remove_action('wp_head', 'rest_output_link_wp_head');
+remove_action('wp_head', 'wp_oembed_add_discovery_links');
+add_filter('the_generator', '__return_empty_string');
+add_filter('show_admin_bar', '__return_false');
 
-function bilisim_excerpt_more() { return '…'; }
-add_filter('excerpt_more', 'bilisim_excerpt_more');
+/* Remove wp-embed script */
+add_action('wp_footer', function() { wp_deregister_script('wp-embed'); });
 
-/* =====================
-   WIDGET AREAS
-===================== */
-function bilisim_widgets_init() {
-    register_sidebar([
-        'name'          => __('Footer Widget 1', 'bilisim-koleji'),
-        'id'            => 'footer-1',
-        'before_widget' => '<div class="footer-widget">',
-        'after_widget'  => '</div>',
-        'before_title'  => '<h4 class="widget-title">',
-        'after_title'   => '</h4>',
-    ]);
-}
-add_action('widgets_init', 'bilisim_widgets_init');
+/* Custom login redirect (disguise wp-admin) */
+add_action('login_head', function() {
+  echo '<style>body.login{background:#050d1f;} .login h1 a{display:none}</style>';
+});
+
+/* Clean wp_head */
+add_filter('wp_headers', function($headers) {
+  unset($headers['X-Pingback']);
+  return $headers;
+});
+
+/* Remove version from scripts/styles */
+add_filter('style_loader_src',  function($src) { return remove_query_arg('ver', $src); });
+add_filter('script_loader_src', function($src) { return remove_query_arg('ver', $src); });
+
+/* Excerpt */
+add_filter('excerpt_length', fn() => 18);
+add_filter('excerpt_more',   fn() => '…');

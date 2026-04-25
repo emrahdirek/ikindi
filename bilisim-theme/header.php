@@ -3,97 +3,108 @@
 <head>
 <meta charset="<?php bloginfo('charset'); ?>">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800;900&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <?php wp_head(); ?>
 </head>
-<body <?php body_class(); ?>>
+<body <?php body_class('dark-theme'); ?>>
 <?php wp_body_open(); ?>
 
-<!-- TOP BAR -->
-<div class="topbar">
-  <div class="container topbar-inner">
-    <div class="topbar-left">
-      <a href="tel:+905056625800">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M6.62 10.79c1.44 2.83 3.76 5.14 6.59 6.59l2.2-2.2c.27-.27.67-.36 1.02-.24 1.12.37 2.33.57 3.57.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1-9.39 0-17-7.61-17-17 0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.57.11.35.03.74-.25 1.02l-2.2 2.2z"/></svg>
-        +90 505 662 58 00
-      </a>
-      <a href="mailto:info@bilisim.k12.tr">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg>
-        info@bilisim.k12.tr
-      </a>
-    </div>
-    <div class="topbar-right">
-      <?php
-      wp_nav_menu([
-        'theme_location' => 'topbar',
-        'container'      => false,
-        'menu_class'     => '',
-        'fallback_cb'    => false,
-        'items_wrap'     => '%3$s',
-        'walker'         => new Bilisim_Topbar_Walker(),
-      ]);
-      ?>
-      <a href="<?php echo esc_url(home_url('/kayit')); ?>" style="background:var(--cyan);color:white;padding:.25rem .8rem;border-radius:20px;font-weight:700;">Kayıt Ol</a>
-    </div>
-  </div>
+<div id="cursor"></div>
+<div id="cursor-ring"></div>
+<canvas id="particle-canvas"></canvas>
+
+<!-- ANNOUNCE -->
+<div class="announce-bar" style="background:linear-gradient(90deg,#7c3aed,#00d4ff);color:#fff;text-align:center;padding:.65rem 3rem;font-size:.85rem;font-weight:600;position:relative;overflow:hidden;">
+  🎓 2025–2026 Bursluluk Sınav Sonuçları Açıklandı! &nbsp;<a href="<?php echo esc_url(home_url('/burs')); ?>" style="color:#fff;text-decoration:underline;">Sonuçları Gör →</a>
+  <span class="announce-close" style="position:absolute;right:1rem;top:50%;transform:translateY(-50%);cursor:none;font-size:1.1rem;opacity:.7;">✕</span>
 </div>
 
 <!-- HEADER -->
-<header class="header">
-  <nav class="nav-wrap">
+<header class="site-header">
+  <div class="container header-inner">
     <a href="<?php echo esc_url(home_url('/')); ?>" class="logo">
-      <?php if (has_custom_logo()): the_custom_logo(); else: ?>
       <div class="logo-mark">
-        <svg viewBox="0 0 24 24" fill="white"><path d="M9.4 16.6L4.8 12l4.6-4.6L8 6l-6 6 6 6 1.4-1.4zm5.2 0l4.6-4.6-4.6-4.6L16 6l6 6-6 6-1.4-1.4z"/></svg>
+        <svg viewBox="0 0 24 24"><path d="M9.4 16.6L4.8 12l4.6-4.6L8 6l-6 6 6 6 1.4-1.4zm5.2 0l4.6-4.6-4.6-4.6L16 6l6 6-6 6-1.4-1.4z"/></svg>
       </div>
-      <div class="logo-text">
-        <strong><?php bloginfo('name'); ?></strong>
-        <span><?php bloginfo('description'); ?></span>
+      <div>
+        <span class="logo-name"><?php bloginfo('name'); ?></span>
+        <span class="logo-sub">Geleceği Kodlayan Nesiller</span>
       </div>
-      <?php endif; ?>
     </a>
 
-    <?php
-    wp_nav_menu([
-      'theme_location' => 'primary',
-      'container'      => false,
-      'menu_class'     => 'nav-links',
-      'fallback_cb'    => 'bilisim_fallback_menu',
-      'walker'         => new Bilisim_Nav_Walker(),
-    ]);
-    ?>
+    <ul class="nav-links">
+      <li class="nav-item">
+        <a href="#">Kurumsal <svg class="arr" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg></a>
+        <ul class="dropdown">
+          <li><a href="<?php echo esc_url(home_url('/hakkimizda')); ?>">Hakkımızda</a></li>
+          <li><a href="<?php echo esc_url(home_url('/basarilari')); ?>">Başarılarımız</a></li>
+          <li><a href="<?php echo esc_url(home_url('/kaizen')); ?>">KAİZEN — YZ Öğrencimiz</a></li>
+          <li><a href="<?php echo esc_url(home_url('/anlasmalı-kurumlar')); ?>">Anlaşmalı Kurumlar</a></li>
+          <li><a href="<?php echo esc_url(home_url('/kariyer')); ?>">Kariyer</a></li>
+        </ul>
+      </li>
+      <li class="nav-item">
+        <a href="#">Kayıt & Burs <svg class="arr" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg></a>
+        <ul class="dropdown">
+          <li><a href="<?php echo esc_url(home_url('/kayit')); ?>">Kayıt Bilgileri</a></li>
+          <li><a href="<?php echo esc_url(home_url('/burs')); ?>">Bursluluk Sınavı</a></li>
+          <li><a href="<?php echo esc_url(home_url('/ucretler')); ?>">Ücret Tablosu</a></li>
+          <li><a href="<?php echo esc_url(home_url('/sss')); ?>">Sıkça Sorulan Sorular</a></li>
+        </ul>
+      </li>
+      <li class="nav-item">
+        <a href="#">Eğitim <svg class="arr" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg></a>
+        <ul class="dropdown">
+          <li><a href="<?php echo esc_url(home_url('/anaokulu')); ?>">Anaokulu</a></li>
+          <li><a href="<?php echo esc_url(home_url('/ilkokul')); ?>">İlkokul</a></li>
+          <li><a href="<?php echo esc_url(home_url('/ortaokul')); ?>">Ortaokul</a></li>
+          <li><a href="<?php echo esc_url(home_url('/lise')); ?>">Lise</a></li>
+        </ul>
+      </li>
+      <li class="nav-item">
+        <a href="#">Model <svg class="arr" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg></a>
+        <ul class="dropdown">
+          <li><a href="<?php echo esc_url(home_url('/stem')); ?>">STEM & Kodlama</a></li>
+          <li><a href="<?php echo esc_url(home_url('/dil')); ?>">Yabancı Dil</a></li>
+          <li><a href="<?php echo esc_url(home_url('/rehberlik')); ?>">Rehberlik</a></li>
+          <li><a href="<?php echo esc_url(home_url('/atolyeler')); ?>">Atölyeler & Kulüpler</a></li>
+        </ul>
+      </li>
+      <li class="nav-item">
+        <a href="#">Kampüsler <svg class="arr" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg></a>
+        <ul class="dropdown">
+          <li><a href="<?php echo esc_url(home_url('/yeni-nesil')); ?>">Yeni Nesil Kampüsü</a></li>
+          <li><a href="<?php echo esc_url(home_url('/cankaya')); ?>">Çankaya Şubesi</a></li>
+          <li><a href="<?php echo esc_url(home_url('/huseyingazi')); ?>">Hüseyingazi Şubesi</a></li>
+        </ul>
+      </li>
+      <li class="nav-item"><a href="<?php echo esc_url(home_url('/iletisim')); ?>">İletişim</a></li>
+    </ul>
 
-    <div class="nav-cta">
-      <a href="<?php echo esc_url(home_url('/kampus-turu')); ?>" class="btn btn-ghost" style="padding:.5rem 1rem;font-size:.82rem;">Kampüs Turu</a>
-      <a href="<?php echo esc_url(home_url('/kayit')); ?>" class="btn btn-primary" style="padding:.5rem 1rem;font-size:.82rem;">Kayıt Ol</a>
+    <div class="header-actions">
+      <a href="<?php echo esc_url(home_url('/kampus-turu')); ?>" class="btn btn-ghost" style="padding:.5rem 1.1rem;font-size:.82rem;">Kampüs Turu</a>
+      <a href="<?php echo esc_url(home_url('/kayit')); ?>" class="btn btn-glow" style="padding:.5rem 1.1rem;font-size:.82rem;">Kayıt Ol</a>
     </div>
 
-    <button class="hamburger" aria-label="Menü">
-      <span></span><span></span><span></span>
-    </button>
-  </nav>
+    <button class="hamburger" aria-label="Menü"><span></span><span></span><span></span></button>
+  </div>
 </header>
 
-<!-- MOBILE NAV -->
-<div class="overlay"></div>
-<nav class="mobile-nav" aria-label="Mobil menü">
-  <button class="mobile-nav-close" aria-label="Kapat">✕</button>
-  <?php
-  wp_nav_menu([
-    'theme_location' => 'primary',
-    'container'      => false,
-    'menu_class'     => 'mobile-nav-links',
-    'fallback_cb'    => false,
-  ]);
-  ?>
-  <div class="mobile-cta">
-    <a href="<?php echo esc_url(home_url('/kayit')); ?>" class="btn btn-primary" style="justify-content:center;">Kayıt Ol</a>
+<!-- MOBILE DRAWER -->
+<div class="mobile-overlay"></div>
+<nav class="mobile-drawer">
+  <button class="drawer-close">✕</button>
+  <ul class="drawer-links">
+    <li><a href="#">Kurumsal</a></li>
+    <li><a href="#">Kayıt & Burs</a></li>
+    <li><a href="#">Eğitim Kademeleri</a></li>
+    <li><a href="#">Eğitim Modeli</a></li>
+    <li><a href="#">Kampüslerimiz</a></li>
+    <li><a href="<?php echo esc_url(home_url('/iletisim')); ?>">İletişim</a></li>
+  </ul>
+  <div class="drawer-cta">
+    <a href="<?php echo esc_url(home_url('/kayit')); ?>" class="btn btn-glow" style="justify-content:center;">Kayıt Ol</a>
     <a href="<?php echo esc_url(home_url('/kampus-turu')); ?>" class="btn btn-ghost" style="justify-content:center;">Kampüs Turu</a>
   </div>
 </nav>
-
-<!-- ANNOUNCEMENT -->
-<div class="announce">
-  🎓 2025–2026 Bursluluk Sınav Sonuçları Açıklandı!
-  <a href="<?php echo esc_url(home_url('/burs')); ?>">Sonuçları Gör →</a>
-  <span class="announce-close">✕</span>
-</div>
