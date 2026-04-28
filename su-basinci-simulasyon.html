@@ -1,0 +1,886 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Su Basıncı — İnteraktif Simülasyon</title>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:      #070c1a;
+      --surface: rgba(255,255,255,0.04);
+      --surf2:   rgba(255,255,255,0.07);
+      --border:  rgba(255,255,255,0.08);
+      --text:    #e2e8f0;
+      --muted:   #64748b;
+      --sidebar: 290px;
+    }
+
+    html, body {
+      height: 100%;
+      font-family: 'Space Grotesk', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      overflow: hidden;
+    }
+
+    .layout { display: flex; flex-direction: column; height: 100vh; }
+
+    /* HEADER */
+    header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0 20px; height: 56px; flex-shrink: 0;
+      background: rgba(7,12,26,0.95);
+      border-bottom: 1px solid var(--border);
+      backdrop-filter: blur(20px); z-index: 20;
+    }
+    .h-brand { display: flex; align-items: center; gap: 10px; }
+    .h-icon {
+      width: 34px; height: 34px;
+      background: linear-gradient(135deg, #0ea5e9 0%, #2563eb 100%);
+      border-radius: 9px; display: grid; place-items: center; font-size: 17px;
+    }
+    .h-title { font-size: .92rem; font-weight: 700; line-height: 1.2; }
+    .h-sub   { font-size: .68rem; color: var(--muted); }
+    .h-badge {
+      padding: 5px 14px; background: rgba(14,165,233,.12);
+      border: 1px solid rgba(14,165,233,.3); border-radius: 20px;
+      font-size: .75rem; font-weight: 600; color: #38bdf8;
+    }
+
+    /* BODY */
+    .body { flex: 1; display: flex; overflow: hidden; }
+
+    /* CANVAS */
+    .cvs-wrap {
+      flex: 1; position: relative; overflow: hidden; min-width: 0;
+      background: radial-gradient(ellipse at 50% 60%, #0a1628 0%, #070c1a 100%);
+    }
+    #sim { display: block; }
+
+    /* SIDEBAR */
+    aside {
+      width: var(--sidebar); flex-shrink: 0;
+      display: flex; flex-direction: column;
+      border-left: 1px solid var(--border);
+      background: rgba(255,255,255,0.015);
+      overflow-y: auto; overflow-x: hidden;
+    }
+    aside::-webkit-scrollbar { width: 4px; }
+    aside::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+    .s-sec { padding: 16px; }
+    .s-sec + .s-sec { border-top: 1px solid var(--border); }
+    .s-lbl {
+      font-size: .65rem; font-weight: 700; color: var(--muted);
+      text-transform: uppercase; letter-spacing: .1em; margin-bottom: 10px;
+    }
+
+    /* Liquid buttons */
+    .liq-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+    .lbtn {
+      display: flex; flex-direction: column; align-items: center;
+      gap: 5px; padding: 10px 8px;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 10px; color: var(--muted);
+      font-family: inherit; font-size: .72rem; font-weight: 600;
+      cursor: pointer; transition: all .18s; text-align: center;
+    }
+    .lbtn:hover { background: var(--surf2); color: var(--text); }
+    .lbtn.on {
+      border-color: var(--lc, #38bdf8); color: var(--lc, #38bdf8);
+      background: rgba(255,255,255,0.06);
+      box-shadow: 0 0 14px -5px var(--lc, #38bdf8);
+    }
+    .lbtn .ldot {
+      width: 20px; height: 20px; border-radius: 50%;
+      background: var(--lc, #64748b); opacity: .8;
+      transition: transform .2s;
+    }
+    .lbtn.on .ldot { transform: scale(1.25); opacity: 1; }
+    .lbtn .lrho { font-size: .62rem; color: var(--muted); margin-top: 1px; }
+    .lbtn.on .lrho { color: var(--lc, #38bdf8); opacity: .7; }
+
+    /* Sliders */
+    .slider-row { margin-bottom: 14px; }
+    .slider-row label {
+      display: flex; justify-content: space-between;
+      font-size: .75rem; font-weight: 600; color: var(--muted); margin-bottom: 7px;
+    }
+    .slider-row label span { color: var(--text); }
+    input[type=range] {
+      width: 100%; appearance: none; height: 4px;
+      background: rgba(255,255,255,0.1); border-radius: 4px; outline: none;
+      cursor: pointer;
+    }
+    input[type=range]::-webkit-slider-thumb {
+      appearance: none; width: 16px; height: 16px; border-radius: 50%;
+      background: #38bdf8; box-shadow: 0 0 8px rgba(56,189,248,.5);
+      cursor: grab; transition: transform .15s;
+    }
+    input[type=range]::-webkit-slider-thumb:active { transform: scale(1.25); }
+
+    /* Formula card */
+    .formula-card {
+      background: rgba(0,0,0,0.25); border: 1px solid var(--border);
+      border-radius: 12px; padding: 14px;
+    }
+    .formula-main {
+      font-size: 1.1rem; font-weight: 700;
+      color: #38bdf8; text-align: center;
+      margin-bottom: 12px; font-family: 'Courier New', monospace;
+      letter-spacing: .03em;
+    }
+    .frow {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 7px 10px; background: rgba(255,255,255,0.04);
+      border-radius: 8px; border: 1px solid var(--border); margin-bottom: 5px;
+    }
+    .frow:last-child { margin-bottom: 0; }
+    .flbl { font-size: .7rem; color: var(--muted); font-weight: 600; }
+    .fval { font-size: .82rem; font-weight: 700; font-family: 'Courier New', monospace; }
+
+    /* Result box */
+    .result-box {
+      background: rgba(14,165,233,.08); border: 1px solid rgba(14,165,233,.25);
+      border-radius: 12px; padding: 14px; text-align: center;
+    }
+    .res-pa  { font-size: 1.4rem; font-weight: 700; color: #38bdf8; margin-bottom: 4px; }
+    .res-kpa { font-size: .85rem; color: var(--muted); margin-bottom: 2px; }
+    .res-atm { font-size: .78rem; color: var(--muted); }
+
+    /* Gauge */
+    .gauge-wrap { display: flex; justify-content: center; padding: 4px 0 0; }
+    #gauge { display: block; }
+
+    /* Hint */
+    .drag-hint {
+      position: absolute; bottom: 14px; left: 50%;
+      transform: translateX(-50%);
+      padding: 6px 16px;
+      background: rgba(7,12,26,0.75); backdrop-filter: blur(12px);
+      border: 1px solid var(--border); border-radius: 20px;
+      font-size: .7rem; color: var(--muted); pointer-events: none;
+      white-space: nowrap; z-index: 5;
+    }
+
+    /* MOBILE */
+    @media (max-width: 720px) {
+      :root { --sidebar: 100%; }
+      .body { flex-direction: column; }
+      aside {
+        width: 100%; border-left: none; border-top: 1px solid var(--border);
+        max-height: 45vh; flex-shrink: 0;
+      }
+      .cvs-wrap { min-height: 55vw; }
+    }
+  </style>
+</head>
+<body>
+<div class="layout">
+
+  <header>
+    <div class="h-brand">
+      <div class="h-icon">💧</div>
+      <div>
+        <div class="h-title">Su Basıncı Simülasyonu</div>
+        <div class="h-sub">Hidrostatik Basınç — P = ρgh</div>
+      </div>
+    </div>
+    <div class="h-badge">İnteraktif</div>
+  </header>
+
+  <div class="body">
+
+    <!-- CANVAS -->
+    <div class="cvs-wrap" id="cvs-wrap">
+      <canvas id="sim"></canvas>
+      <div class="drag-hint">🖱 Sensörü yukarı/aşağı sürükle</div>
+    </div>
+
+    <!-- SIDEBAR -->
+    <aside>
+
+      <div class="s-sec">
+        <div class="s-lbl">Sıvı Türü</div>
+        <div class="liq-grid" id="liqGrid"></div>
+      </div>
+
+      <div class="s-sec">
+        <div class="s-lbl">Parametreler</div>
+        <div class="slider-row">
+          <label>Su Yüksekliği <span id="wHval">8.0 m</span></label>
+          <input type="range" id="slWH" min="2" max="10" step="0.1" value="8">
+        </div>
+        <div class="slider-row">
+          <label>Sensör Derinliği <span id="dVal">4.0 m</span></label>
+          <input type="range" id="slDep" min="0.1" max="10" step="0.1" value="4">
+        </div>
+      </div>
+
+      <div class="s-sec">
+        <div class="s-lbl">Formül</div>
+        <div class="formula-card">
+          <div class="formula-main">P = ρ × g × h</div>
+          <div class="frow"><span class="flbl">ρ (Yoğunluk)</span><span class="fval" id="fRho">1000 kg/m³</span></div>
+          <div class="frow"><span class="flbl">g (Yerçekimi)</span><span class="fval" style="color:#a3e635">9.81 m/s²</span></div>
+          <div class="frow"><span class="flbl">h (Derinlik)</span><span class="fval" id="fH" style="color:#fb923c">4.00 m</span></div>
+        </div>
+      </div>
+
+      <div class="s-sec">
+        <div class="s-lbl">Sonuç</div>
+        <div class="result-box">
+          <div class="res-pa" id="rPa">39 240 Pa</div>
+          <div class="res-kpa" id="rKpa">39.24 kPa</div>
+          <div class="res-atm" id="rAtm">0.387 atm</div>
+        </div>
+      </div>
+
+      <div class="s-sec">
+        <div class="s-lbl">Basınç Göstergesi</div>
+        <div class="gauge-wrap"><canvas id="gauge" width="230" height="130"></canvas></div>
+      </div>
+
+    </aside>
+  </div>
+</div>
+
+<script>
+/* ── LIQUID DATA ─────────────────────────────────────────── */
+const LIQUIDS = [
+  { id:'water',     name:'Su (H₂O)',    rho:1000,  css:'#38bdf8', fill:['#60a5fa','#1e3a5f'], dot:'#38bdf8' },
+  { id:'saltwater', name:'Tuzlu Su',    rho:1025,  css:'#34d399', fill:['#34d399','#064e3b'], dot:'#34d399' },
+  { id:'oil',       name:'Gaz Yağı',    rho:800,   css:'#fbbf24', fill:['#fcd34d','#78350f'], dot:'#fbbf24' },
+  { id:'mercury',   name:'Cıva (Hg)',   rho:13600, css:'#cbd5e1', fill:['#e2e8f0','#334155'], dot:'#cbd5e1' },
+];
+
+const G = 9.81;
+const MAX_M = 10;
+
+let liquid = LIQUIDS[0];
+let waterH  = 8;
+let probeDep = 4;
+let time = 0;
+let isDrag = false;
+
+/* ── BUILD LIQUID BUTTONS ───────────────────────────────── */
+const liqGrid = document.getElementById('liqGrid');
+LIQUIDS.forEach(lq => {
+  const b = document.createElement('button');
+  b.className = 'lbtn' + (lq === liquid ? ' on' : '');
+  b.dataset.id = lq.id;
+  b.style.setProperty('--lc', lq.css);
+  b.innerHTML = `<span class="ldot"></span>${lq.name}<span class="lrho">ρ = ${lq.rho.toLocaleString()} kg/m³</span>`;
+  liqGrid.appendChild(b);
+});
+liqGrid.addEventListener('click', e => {
+  const btn = e.target.closest('.lbtn');
+  if (!btn) return;
+  const found = LIQUIDS.find(l => l.id === btn.dataset.id);
+  if (!found) return;
+  liquid = found;
+  document.querySelectorAll('.lbtn').forEach(b => {
+    b.classList.toggle('on', b.dataset.id === liquid.id);
+    b.style.setProperty('--lc', LIQUIDS.find(l => l.id === b.dataset.id).css);
+  });
+  updateUI();
+});
+
+/* ── SLIDERS ────────────────────────────────────────────── */
+const slWH  = document.getElementById('slWH');
+const slDep = document.getElementById('slDep');
+
+slWH.addEventListener('input', () => {
+  waterH = parseFloat(slWH.value);
+  probeDep = Math.min(probeDep, waterH - 0.1);
+  slDep.max = waterH;
+  slDep.value = probeDep;
+  updateUI();
+});
+
+slDep.addEventListener('input', () => {
+  probeDep = parseFloat(slDep.value);
+  updateUI();
+});
+
+/* ── UI UPDATE ──────────────────────────────────────────── */
+function updateUI() {
+  const P = liquid.rho * G * probeDep;
+  document.getElementById('wHval').textContent = waterH.toFixed(1) + ' m';
+  document.getElementById('dVal').textContent  = probeDep.toFixed(1) + ' m';
+  document.getElementById('fRho').textContent  = liquid.rho.toLocaleString() + ' kg/m³';
+  document.getElementById('fRho').style.color  = liquid.css;
+  document.getElementById('fH').textContent    = probeDep.toFixed(2) + ' m';
+  document.getElementById('rPa').textContent   = Math.round(P).toLocaleString('tr') + ' Pa';
+  document.getElementById('rKpa').textContent  = (P/1000).toFixed(2) + ' kPa';
+  document.getElementById('rAtm').textContent  = (P/101325).toFixed(4) + ' atm';
+  document.getElementById('rPa').style.color   = pColor(probeDep / waterH);
+  drawGauge();
+}
+
+/* ── PRESSURE COLOR ─────────────────────────────────────── */
+function pColor(ratio, alpha = 1) {
+  ratio = Math.max(0, Math.min(1, ratio));
+  const stops = [
+    [0,    [56,  189, 248]],
+    [0.33, [52,  211, 153]],
+    [0.66, [251, 146,  60]],
+    [1,    [239,  68,  68]],
+  ];
+  for (let i = 0; i < stops.length - 1; i++) {
+    const [t0, c0] = stops[i], [t1, c1] = stops[i+1];
+    if (ratio >= t0 && ratio <= t1) {
+      const t = (ratio - t0) / (t1 - t0);
+      const r = Math.round(c0[0] + (c1[0]-c0[0])*t);
+      const g = Math.round(c0[1] + (c1[1]-c0[1])*t);
+      const b = Math.round(c0[2] + (c1[2]-c0[2])*t);
+      return `rgba(${r},${g},${b},${alpha})`;
+    }
+  }
+  return `rgba(239,68,68,${alpha})`;
+}
+
+/* ── CANVAS SETUP ───────────────────────────────────────── */
+const canvas  = document.getElementById('sim');
+const ctx     = canvas.getContext('2d');
+const cWrap   = document.getElementById('cvs-wrap');
+const dpr     = Math.min(window.devicePixelRatio || 1, 2);
+let W = 0, H = 0;
+
+function resizeCanvas() {
+  W = cWrap.clientWidth;
+  H = cWrap.clientHeight;
+  canvas.width  = W * dpr;
+  canvas.height = H * dpr;
+  canvas.style.width  = W + 'px';
+  canvas.style.height = H + 'px';
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+
+window.addEventListener('resize', resizeCanvas);
+resizeCanvas();
+
+/* ── TANK DIMENSIONS ────────────────────────────────────── */
+function tank() {
+  const pad = 16;
+  const ruleW = 54;
+  const scaleW = 18;
+  return {
+    x: ruleW + pad,
+    y: pad + 30,
+    w: W - ruleW - scaleW - pad * 2,
+    h: H - (pad + 30) - pad - 20,
+    ruleX: pad,
+    scaleX: W - scaleW - pad + 4,
+  };
+}
+
+/* ── BUBBLES ────────────────────────────────────────────── */
+const BUBBLES = Array.from({length: 14}, () => makeBubble(true));
+function makeBubble(init = false) {
+  const tk = tank();
+  return {
+    x:  tk.x + Math.random() * tk.w,
+    y:  init ? tk.y + Math.random() * tk.h : tk.y + tk.h,
+    r:  Math.random() * 2.5 + 0.8,
+    vy: Math.random() * 0.4 + 0.25,
+    wx: Math.random() * Math.PI * 2,
+    ws: Math.random() * 0.04 + 0.02,
+  };
+}
+function updateBubbles() {
+  const tk = tank();
+  const waterTopY = tk.y + tk.h - (waterH / MAX_M) * tk.h;
+  BUBBLES.forEach(b => {
+    b.y  -= b.vy;
+    b.wx += b.ws;
+    b.x  += Math.sin(b.wx) * 0.45;
+    if (b.y < waterTopY - 5) {
+      Object.assign(b, makeBubble());
+      b.x = tk.x + Math.random() * tk.w;
+    }
+  });
+}
+
+/* ── DRAW ───────────────────────────────────────────────── */
+function draw() {
+  ctx.clearRect(0, 0, W, H);
+  const tk    = tank();
+  const pxPerM = tk.h / MAX_M;
+  const waterTopY  = tk.y + tk.h - waterH * pxPerM;
+  const probeY     = waterTopY + probeDep * pxPerM;
+  const probeX     = tk.x + tk.w / 2;
+  const ratio      = probeDep / waterH;
+
+  drawTank(tk, waterTopY, probeY);
+  drawRuler(tk, pxPerM, waterTopY);
+  drawPressureScale(tk, waterTopY);
+  drawBubbles(tk, waterTopY);
+  drawDepthLine(tk, probeY);
+  drawPressureArrows(tk, probeX, probeY, ratio);
+  drawProbe(probeX, probeY, ratio);
+  drawLabels(tk, pxPerM, waterTopY, probeY, probeX);
+}
+
+/* Tank & water */
+function drawTank(tk, waterTopY, probeY) {
+  // Tank glass walls
+  ctx.save();
+  ctx.strokeStyle = 'rgba(148,163,184,0.25)';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(tk.x, tk.y, tk.w, tk.h);
+
+  // Glass highlight
+  const hlGrad = ctx.createLinearGradient(tk.x, 0, tk.x + tk.w, 0);
+  hlGrad.addColorStop(0,   'rgba(255,255,255,0.06)');
+  hlGrad.addColorStop(0.05,'rgba(255,255,255,0.12)');
+  hlGrad.addColorStop(0.1, 'rgba(255,255,255,0.02)');
+  hlGrad.addColorStop(1,   'rgba(255,255,255,0.01)');
+  ctx.fillStyle = hlGrad;
+  ctx.fillRect(tk.x, tk.y, tk.w, tk.h);
+
+  // Air zone (above water)
+  if (waterTopY > tk.y) {
+    ctx.fillStyle = 'rgba(30,41,59,0.3)';
+    ctx.fillRect(tk.x + 1, tk.y + 1, tk.w - 2, waterTopY - tk.y - 1);
+  }
+
+  // Water body gradient
+  const waterGrad = ctx.createLinearGradient(0, waterTopY, 0, tk.y + tk.h);
+  waterGrad.addColorStop(0,   'rgba(56,189,248,0.55)');
+  waterGrad.addColorStop(0.3, liquid.fill[0] + 'aa');
+  waterGrad.addColorStop(1,   liquid.fill[1] + 'cc');
+  ctx.fillStyle = waterGrad;
+  ctx.fillRect(tk.x + 1, waterTopY, tk.w - 2, tk.y + tk.h - waterTopY - 1);
+
+  // Animated water surface
+  ctx.beginPath();
+  ctx.moveTo(tk.x, waterTopY);
+  for (let xi = 0; xi <= tk.w; xi += 2) {
+    const wy = waterTopY + Math.sin((xi / tk.w) * Math.PI * 4 + time * 1.8) * 2.5
+                         + Math.sin((xi / tk.w) * Math.PI * 7 + time * 2.5) * 1.2;
+    ctx.lineTo(tk.x + xi, wy);
+  }
+  ctx.lineTo(tk.x + tk.w, waterTopY);
+  ctx.closePath();
+  ctx.fillStyle = 'rgba(186,230,253,0.35)';
+  ctx.fill();
+
+  // Surface shimmer line
+  ctx.beginPath();
+  ctx.moveTo(tk.x, waterTopY);
+  for (let xi = 0; xi <= tk.w; xi += 2) {
+    const wy = waterTopY + Math.sin((xi / tk.w) * Math.PI * 4 + time * 1.8) * 2.5
+                         + Math.sin((xi / tk.w) * Math.PI * 7 + time * 2.5) * 1.2;
+    ctx.lineTo(tk.x + xi, wy);
+  }
+  ctx.strokeStyle = 'rgba(186,230,253,0.7)';
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+
+  // Bottom gradient (pressure zone)
+  const btmGrad = ctx.createLinearGradient(0, probeY - 40, 0, tk.y + tk.h);
+  btmGrad.addColorStop(0, 'transparent');
+  btmGrad.addColorStop(1, 'rgba(239,68,68,0.06)');
+  ctx.fillStyle = btmGrad;
+  ctx.fillRect(tk.x + 1, waterTopY, tk.w - 2, tk.h - (waterTopY - tk.y) - 1);
+
+  ctx.restore();
+}
+
+/* Ruler (left side) */
+function drawRuler(tk, pxPerM, waterTopY) {
+  ctx.save();
+  ctx.font = '600 10px Space Grotesk, sans-serif';
+  ctx.textAlign = 'right';
+
+  for (let m = 0; m <= MAX_M; m++) {
+    const y = tk.y + tk.h - m * pxPerM;
+    if (y < tk.y - 2) continue;
+
+    const isMajor = m % 2 === 0;
+    const tickW   = isMajor ? 10 : 6;
+
+    ctx.beginPath();
+    ctx.moveTo(tk.x - 2, y);
+    ctx.lineTo(tk.x - 2 - tickW, y);
+    ctx.strokeStyle = isMajor ? 'rgba(148,163,184,0.7)' : 'rgba(100,116,139,0.5)';
+    ctx.lineWidth = isMajor ? 1.5 : 1;
+    ctx.stroke();
+
+    if (isMajor) {
+      ctx.fillStyle = m <= waterH ? 'rgba(186,230,253,0.85)' : 'rgba(100,116,139,0.5)';
+      ctx.fillText(m + 'm', tk.x - 15, y + 4);
+    }
+  }
+
+  // Water level marker
+  ctx.beginPath();
+  ctx.moveTo(tk.x - 2, waterTopY);
+  ctx.lineTo(tk.x - 14, waterTopY);
+  ctx.strokeStyle = '#38bdf8';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+  ctx.fillStyle = '#38bdf8';
+  ctx.textAlign = 'right';
+  ctx.font = 'bold 9px Space Grotesk, sans-serif';
+  ctx.fillText('▶ ' + waterH.toFixed(1) + 'm', tk.x - 1, waterTopY - 5);
+
+  ctx.restore();
+}
+
+/* Pressure color scale (right side) */
+function drawPressureScale(tk, waterTopY) {
+  ctx.save();
+  const sx = tk.scaleX;
+  const sw = 10;
+  const grad = ctx.createLinearGradient(0, waterTopY, 0, tk.y + tk.h);
+  grad.addColorStop(0,    'rgba(56,189,248,0.9)');
+  grad.addColorStop(0.33, 'rgba(52,211,153,0.9)');
+  grad.addColorStop(0.66, 'rgba(251,146,60,0.9)');
+  grad.addColorStop(1,    'rgba(239,68,68,0.9)');
+  ctx.fillStyle = grad;
+  ctx.beginPath();
+  ctx.roundRect(sx, waterTopY, sw, tk.y + tk.h - waterTopY, 5);
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(255,255,255,0.1)';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+
+  // Labels
+  ctx.font = '9px Space Grotesk, sans-serif';
+  ctx.textAlign = 'left';
+  ctx.fillStyle = 'rgba(148,163,184,0.7)';
+  ctx.fillText('0', sx + sw + 3, waterTopY + 8);
+  const maxP = liquid.rho * G * waterH;
+  const maxTxt = maxP >= 1000 ? (maxP/1000).toFixed(0)+'k' : Math.round(maxP)+'';
+  ctx.fillText(maxTxt, sx + sw + 3, tk.y + tk.h);
+  ctx.fillText('Pa', sx + sw + 3, tk.y + tk.h + 10);
+  ctx.restore();
+}
+
+/* Bubbles */
+function drawBubbles(tk, waterTopY) {
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(tk.x, waterTopY, tk.w, tk.y + tk.h - waterTopY);
+  ctx.clip();
+  BUBBLES.forEach(b => {
+    ctx.beginPath();
+    ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2);
+    ctx.strokeStyle = 'rgba(186,230,253,0.35)';
+    ctx.lineWidth = 0.8;
+    ctx.stroke();
+    ctx.fillStyle = 'rgba(186,230,253,0.06)';
+    ctx.fill();
+  });
+  ctx.restore();
+}
+
+/* Depth dashed line */
+function drawDepthLine(tk, probeY) {
+  ctx.save();
+  ctx.setLineDash([4, 4]);
+  ctx.beginPath();
+  ctx.moveTo(tk.x + 2, probeY);
+  ctx.lineTo(tk.x + tk.w - 2, probeY);
+  ctx.strokeStyle = 'rgba(148,163,184,0.3)';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+  ctx.restore();
+}
+
+/* Pressure arrows (radial, converging on probe) */
+function drawPressureArrows(tk, probeX, probeY, ratio) {
+  const dirs = 8;
+  const outerR = 38 + ratio * 22;
+  const innerR = 16;
+  const alpha  = 0.5 + ratio * 0.4;
+  const col    = pColor(ratio, alpha);
+
+  // clip to tank water zone
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(tk.x, tk.y, tk.w, tk.h);
+  ctx.clip();
+
+  for (let i = 0; i < dirs; i++) {
+    const angle = (i / dirs) * Math.PI * 2;
+    const sx = probeX + Math.cos(angle) * outerR;
+    const sy = probeY + Math.sin(angle) * outerR;
+    const ex = probeX + Math.cos(angle) * innerR;
+    const ey = probeY + Math.sin(angle) * innerR;
+    drawArrow(ctx, sx, sy, ex, ey, col, 1.5 + ratio * 1);
+  }
+
+  // Horizontal pressure bands (left & right wall arrows)
+  const numBands = 4;
+  for (let i = 0; i < numBands; i++) {
+    const dy = (i - (numBands-1)/2) * 22;
+    const py = probeY + dy;
+    if (py < tk.y || py > tk.y + tk.h) continue;
+    const len = 14 + ratio * 18;
+    const a   = alpha * 0.4;
+    const c   = pColor(ratio, a);
+    // Left wall
+    drawArrow(ctx, tk.x + 4, py, tk.x + 4 + len, py, c, 1);
+    // Right wall
+    drawArrow(ctx, tk.x + tk.w - 4, py, tk.x + tk.w - 4 - len, py, c, 1);
+  }
+
+  ctx.restore();
+}
+
+function drawArrow(ctx, x1, y1, x2, y2, color, lw = 1.5) {
+  const dx = x2 - x1, dy = y2 - y1;
+  const len = Math.sqrt(dx*dx + dy*dy);
+  if (len < 1) return;
+  const ux = dx/len, uy = dy/len;
+  const headLen = Math.min(6, len * 0.4);
+  const hAngle = 0.45;
+
+  ctx.save();
+  ctx.strokeStyle = color;
+  ctx.fillStyle   = color;
+  ctx.lineWidth   = lw;
+  ctx.lineCap     = 'round';
+
+  ctx.beginPath();
+  ctx.moveTo(x1, y1);
+  ctx.lineTo(x2 - ux * headLen, y2 - uy * headLen);
+  ctx.stroke();
+
+  ctx.beginPath();
+  ctx.moveTo(x2, y2);
+  ctx.lineTo(x2 - headLen * (ux*Math.cos(hAngle) - uy*Math.sin(hAngle)),
+             y2 - headLen * (uy*Math.cos(hAngle) + ux*Math.sin(hAngle)));
+  ctx.lineTo(x2 - headLen * (ux*Math.cos(-hAngle) - uy*Math.sin(-hAngle)),
+             y2 - headLen * (uy*Math.cos(-hAngle) + ux*Math.sin(-hAngle)));
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+}
+
+/* Probe sensor */
+function drawProbe(px, py, ratio) {
+  const col = pColor(ratio);
+
+  // Outer glow
+  const grd = ctx.createRadialGradient(px, py, 4, px, py, 26);
+  grd.addColorStop(0,   pColor(ratio, 0.3));
+  grd.addColorStop(1,   'transparent');
+  ctx.beginPath();
+  ctx.arc(px, py, 26, 0, Math.PI * 2);
+  ctx.fillStyle = grd;
+  ctx.fill();
+
+  // Body
+  ctx.beginPath();
+  ctx.arc(px, py, 13, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(15,23,42,0.9)';
+  ctx.fill();
+  ctx.strokeStyle = col;
+  ctx.lineWidth = 2.5;
+  ctx.stroke();
+
+  // Crosshair
+  ctx.save();
+  ctx.strokeStyle = col;
+  ctx.lineWidth = 1.2;
+  [-1,1].forEach(d => {
+    ctx.beginPath();
+    ctx.moveTo(px + d * 5, py);
+    ctx.lineTo(px + d * 10, py);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(px, py + d * 5);
+    ctx.lineTo(px, py + d * 10);
+    ctx.stroke();
+  });
+
+  // Center dot
+  ctx.beginPath();
+  ctx.arc(px, py, 3, 0, Math.PI * 2);
+  ctx.fillStyle = col;
+  ctx.fill();
+  ctx.restore();
+}
+
+/* Floating labels */
+function drawLabels(tk, pxPerM, waterTopY, probeY, probeX) {
+  const P     = liquid.rho * G * probeDep;
+  const ratio = probeDep / waterH;
+  const col   = pColor(ratio);
+
+  ctx.save();
+
+  // Depth callout
+  const callX = probeX + 22;
+  const callY = probeY - 12;
+  ctx.font = 'bold 11px Space Grotesk, sans-serif';
+
+  const txt1 = 'h = ' + probeDep.toFixed(1) + ' m';
+  const txt2 = P >= 1000 ? (P/1000).toFixed(1) + ' kPa' : Math.round(P) + ' Pa';
+  const tw   = Math.max(ctx.measureText(txt1).width, ctx.measureText(txt2).width);
+
+  ctx.fillStyle = 'rgba(7,12,26,0.82)';
+  ctx.beginPath();
+  ctx.roundRect(callX - 4, callY - 14, tw + 14, 36, 7);
+  ctx.fill();
+  ctx.strokeStyle = col;
+  ctx.lineWidth = 1;
+  ctx.stroke();
+
+  ctx.fillStyle = '#e2e8f0';
+  ctx.fillText(txt1, callX + 3, callY);
+  ctx.fillStyle = col;
+  ctx.fillText(txt2, callX + 3, callY + 15);
+
+  // Water surface label
+  ctx.font = '10px Space Grotesk, sans-serif';
+  ctx.fillStyle = 'rgba(186,230,253,0.6)';
+  ctx.textAlign = 'center';
+  ctx.fillText('Su yüzeyi (P = 0)', probeX, waterTopY - 10);
+
+  // Tank bottom label
+  const botP = liquid.rho * G * waterH;
+  ctx.fillStyle = pColor(1, 0.6);
+  ctx.fillText('Maks. basınç: ' + (botP/1000).toFixed(1) + ' kPa', probeX, tk.y + tk.h + 14);
+
+  ctx.restore();
+}
+
+/* ── GAUGE CANVAS ───────────────────────────────────────── */
+const gCvs = document.getElementById('gauge');
+const gCtx = gCvs.getContext('2d');
+
+function drawGauge() {
+  const W2 = gCvs.width, H2 = gCvs.height;
+  gCtx.clearRect(0, 0, W2, H2);
+
+  const cx = W2 / 2, cy = H2 - 18;
+  const r  = Math.min(cx, H2) - 18;
+  const startA = Math.PI, endA = 0;
+
+  // Track arc
+  gCtx.beginPath();
+  gCtx.arc(cx, cy, r, startA, endA);
+  gCtx.strokeStyle = 'rgba(255,255,255,0.06)';
+  gCtx.lineWidth = 12;
+  gCtx.lineCap = 'round';
+  gCtx.stroke();
+
+  // Color arc segments
+  const segs = 60;
+  for (let i = 0; i < segs; i++) {
+    const t = i / segs;
+    const a1 = startA + t * Math.PI;
+    const a2 = startA + (i+1) / segs * Math.PI;
+    gCtx.beginPath();
+    gCtx.arc(cx, cy, r, a1, a2);
+    gCtx.strokeStyle = pColor(t, 0.85);
+    gCtx.lineWidth = 12;
+    gCtx.lineCap = 'butt';
+    gCtx.stroke();
+  }
+
+  // Needle
+  const ratio = Math.min(probeDep / (waterH || 1), 1);
+  const needleAngle = startA + ratio * Math.PI;
+  const nx = cx + Math.cos(needleAngle) * (r - 4);
+  const ny = cy + Math.sin(needleAngle) * (r - 4);
+
+  gCtx.beginPath();
+  gCtx.moveTo(cx, cy);
+  gCtx.lineTo(nx, ny);
+  gCtx.strokeStyle = '#f1f5f9';
+  gCtx.lineWidth = 2.5;
+  gCtx.lineCap = 'round';
+  gCtx.stroke();
+
+  // Center dot
+  gCtx.beginPath();
+  gCtx.arc(cx, cy, 5, 0, Math.PI * 2);
+  gCtx.fillStyle = '#f1f5f9';
+  gCtx.fill();
+
+  // Labels
+  gCtx.font = '9px Space Grotesk, sans-serif';
+  gCtx.fillStyle = 'rgba(148,163,184,0.7)';
+  gCtx.textAlign = 'left';
+  gCtx.fillText('0', cx - r - 2, cy + 4);
+  gCtx.textAlign = 'right';
+  const maxP = liquid.rho * G * waterH;
+  const maxTxt = maxP >= 1000 ? (maxP/1000).toFixed(0)+'k Pa' : Math.round(maxP)+' Pa';
+  gCtx.fillText(maxTxt, cx + r + 2, cy + 4);
+
+  // Current value
+  const P = liquid.rho * G * probeDep;
+  gCtx.textAlign = 'center';
+  gCtx.font = 'bold 12px Space Grotesk, sans-serif';
+  gCtx.fillStyle = pColor(ratio);
+  const valTxt = P >= 1000 ? (P/1000).toFixed(1) + ' kPa' : Math.round(P) + ' Pa';
+  gCtx.fillText(valTxt, cx, cy - r * 0.3);
+}
+
+/* ── PROBE DRAG ─────────────────────────────────────────── */
+function canvasXY(e) {
+  const rect = canvas.getBoundingClientRect();
+  const src  = e.touches ? e.touches[0] : e;
+  return {
+    x: (src.clientX - rect.left) * (W / rect.width),
+    y: (src.clientY - rect.top)  * (H / rect.height)
+  };
+}
+
+function hitProbe(pos) {
+  const tk     = tank();
+  const pxPerM = tk.h / MAX_M;
+  const waterTopY = tk.y + tk.h - waterH * pxPerM;
+  const probeY    = waterTopY + probeDep * pxPerM;
+  const probeX    = tk.x + tk.w / 2;
+  const dx = pos.x - probeX, dy = pos.y - probeY;
+  return Math.sqrt(dx*dx + dy*dy) < 22;
+}
+
+canvas.addEventListener('mousedown',  e => { if (hitProbe(canvasXY(e))) isDrag = true; });
+canvas.addEventListener('touchstart', e => { if (hitProbe(canvasXY(e))) { isDrag = true; e.preventDefault(); } }, { passive: false });
+
+window.addEventListener('mousemove',  e => { if (!isDrag) return; updateProbe(canvasXY(e)); });
+window.addEventListener('touchmove',  e => { if (!isDrag) return; updateProbe(canvasXY(e)); e.preventDefault(); }, { passive: false });
+
+window.addEventListener('mouseup',  () => { isDrag = false; });
+window.addEventListener('touchend', () => { isDrag = false; });
+
+function updateProbe(pos) {
+  const tk = tank();
+  const pxPerM    = tk.h / MAX_M;
+  const waterTopY = tk.y + tk.h - waterH * pxPerM;
+  const waterBotY = tk.y + tk.h;
+  const clampedY  = Math.max(waterTopY + 4, Math.min(waterBotY - 4, pos.y));
+  probeDep = (clampedY - waterTopY) / pxPerM;
+  probeDep = Math.max(0.05, Math.min(waterH, +probeDep.toFixed(2)));
+  slDep.value = probeDep;
+  updateUI();
+}
+
+canvas.addEventListener('mousemove', e => {
+  canvas.style.cursor = hitProbe(canvasXY(e)) ? 'ns-resize' : 'default';
+});
+
+/* ── ANIMATION LOOP ─────────────────────────────────────── */
+function loop() {
+  time += 0.016;
+  updateBubbles();
+  draw();
+  requestAnimationFrame(loop);
+}
+
+updateUI();
+loop();
+</script>
+</body>
+</html>

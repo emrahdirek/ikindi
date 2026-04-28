@@ -1,0 +1,734 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Eğik Atış Simülasyonu</title>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg:      #070c1a;
+      --surface: rgba(255,255,255,0.04);
+      --surf2:   rgba(255,255,255,0.07);
+      --border:  rgba(255,255,255,0.08);
+      --text:    #e2e8f0;
+      --muted:   #64748b;
+      --sidebar: 296px;
+    }
+    html, body {
+      height: 100%; overflow: hidden;
+      font-family: 'Space Grotesk', system-ui, sans-serif;
+      background: var(--bg); color: var(--text);
+    }
+    .layout { display: flex; flex-direction: column; height: 100vh; }
+
+    /* HEADER */
+    header {
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 12px; padding: 0 18px; height: 54px; flex-shrink: 0;
+      background: rgba(7,12,26,0.95); border-bottom: 1px solid var(--border);
+      backdrop-filter: blur(20px); z-index: 20;
+    }
+    .h-left { display: flex; align-items: center; gap: 10px; }
+    .h-icon {
+      width: 32px; height: 32px;
+      background: linear-gradient(135deg, #f97316, #dc2626);
+      border-radius: 8px; display: grid; place-items: center; font-size: 15px; flex-shrink: 0;
+    }
+    .h-title { font-size: .88rem; font-weight: 700; }
+    .h-sub   { font-size: .65rem; color: var(--muted); }
+    .tabs { display: flex; gap: 5px; }
+    .tab {
+      padding: 7px 13px; background: var(--surface); border: 1px solid var(--border);
+      border-radius: 8px; color: var(--muted); font-family: inherit; font-size: .76rem;
+      font-weight: 600; cursor: pointer; transition: all .18s; white-space: nowrap;
+    }
+    .tab:hover { background: var(--surf2); color: var(--text); }
+    .tab.on { background: rgba(249,115,22,.18); border-color: rgba(249,115,22,.5); color: #fb923c; }
+
+    /* BODY */
+    .body { flex: 1; display: flex; overflow: hidden; min-height: 0; }
+
+    /* CANVAS */
+    .cvs-wrap { flex: 1; position: relative; overflow: hidden; min-width: 0; }
+    #sim { display: block; }
+
+    /* SIDEBAR */
+    aside {
+      width: var(--sidebar); flex-shrink: 0; display: flex; flex-direction: column;
+      border-left: 1px solid var(--border); background: rgba(255,255,255,0.015);
+      overflow-y: auto; overflow-x: hidden;
+    }
+    aside::-webkit-scrollbar { width: 3px; }
+    aside::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+    .s-sec { padding: 14px; }
+    .s-sec + .s-sec { border-top: 1px solid var(--border); }
+    .s-lbl {
+      font-size: .62rem; font-weight: 700; color: var(--muted);
+      text-transform: uppercase; letter-spacing: .1em; margin-bottom: 10px;
+    }
+
+    /* Buttons */
+    .btn-row { display: flex; gap: 7px; }
+    .btn {
+      flex: 1; padding: 10px 6px; border: 1px solid var(--border);
+      border-radius: 9px; font-family: inherit; font-size: .8rem; font-weight: 700;
+      cursor: pointer; transition: all .18s; text-align: center;
+    }
+    .btn-start { background: rgba(249,115,22,.15); border-color: rgba(249,115,22,.4); color: #fb923c; }
+    .btn-start:hover { background: rgba(249,115,22,.25); }
+    .btn-pause { background: var(--surface); color: var(--text); }
+    .btn-pause:hover { background: var(--surf2); }
+    .btn-reset { background: rgba(239,68,68,.12); border-color: rgba(239,68,68,.3); color: #f87171; }
+    .btn-reset:hover { background: rgba(239,68,68,.22); }
+
+    /* Toggle row */
+    .tgl-row { display: flex; gap: 6px; margin-top: 9px; flex-wrap: wrap; }
+    .tgl {
+      display: flex; align-items: center; gap: 4px;
+      padding: 5px 10px; background: var(--surface); border: 1px solid var(--border);
+      border-radius: 7px; color: var(--muted); font-family: inherit; font-size: .71rem;
+      font-weight: 600; cursor: pointer; transition: all .18s;
+    }
+    .tgl.on { background: rgba(99,102,241,.18); border-color: rgba(99,102,241,.45); color: #a5b4fc; }
+
+    /* Sliders */
+    .sl-row { margin-bottom: 11px; }
+    .sl-row label {
+      display: flex; justify-content: space-between;
+      font-size: .73rem; font-weight: 600; color: var(--muted); margin-bottom: 6px;
+    }
+    .sl-row label span { color: var(--text); font-weight: 700; }
+    input[type=range] {
+      width: 100%; appearance: none; height: 4px;
+      background: rgba(255,255,255,.1); border-radius: 4px; outline: none; cursor: pointer;
+    }
+    input[type=range]::-webkit-slider-thumb {
+      appearance: none; width: 15px; height: 15px; border-radius: 50%;
+      background: #fb923c; box-shadow: 0 0 8px rgba(249,115,22,.5); cursor: grab;
+    }
+
+    /* Stats grid */
+    .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+    .stat-card {
+      background: rgba(0,0,0,.2); border: 1px solid var(--border);
+      border-radius: 9px; padding: 9px 10px;
+    }
+    .stat-k { font-size: .65rem; color: var(--muted); font-weight: 600; margin-bottom: 2px; }
+    .stat-v { font-size: 1.1rem; font-weight: 800; font-family: 'Courier New', monospace; }
+
+    /* Table */
+    table { width: 100%; border-collapse: collapse; font-size: .78rem; }
+    thead th {
+      text-align: left; padding: 5px 8px; color: var(--muted);
+      font-weight: 600; font-size: .68rem; text-transform: uppercase;
+      border-bottom: 1px solid var(--border);
+    }
+    tbody tr:nth-child(even) { background: rgba(255,255,255,.02); }
+    tbody td { padding: 5px 8px; color: var(--text); font-family: 'Courier New', monospace; font-size: .78rem; }
+    .tbl-wrap { max-height: 200px; overflow-y: auto; }
+    .tbl-wrap::-webkit-scrollbar { width: 3px; }
+    .tbl-wrap::-webkit-scrollbar-thumb { background: var(--border); }
+
+    /* Result box */
+    .result-box {
+      background: rgba(249,115,22,.08); border: 1px solid rgba(249,115,22,.2);
+      border-radius: 10px; padding: 12px; text-align: center; display: none;
+    }
+    .result-box.show { display: block; }
+    .res-R { font-size: 1.3rem; font-weight: 800; color: #fb923c; }
+    .res-T { font-size: .8rem; color: var(--muted); margin-top: 3px; }
+
+    /* Hint label */
+    .g-badge {
+      position: absolute; top: 12px; left: 12px;
+      padding: 5px 13px; background: rgba(7,12,26,.75); backdrop-filter: blur(12px);
+      border: 1px solid var(--border); border-radius: 20px;
+      font-size: .7rem; font-weight: 600; color: #a5b4fc; z-index: 5; pointer-events: none;
+    }
+
+    /* MOBILE */
+    @media (max-width: 700px) {
+      :root { --sidebar: 100%; }
+      .body { flex-direction: column; }
+      aside { width: 100%; border-left: none; border-top: 1px solid var(--border); max-height: 42vh; }
+      .tabs .tab { font-size: .68rem; padding: 5px 9px; }
+      .h-sub { display: none; }
+    }
+  </style>
+</head>
+<body>
+<div class="layout">
+
+  <header>
+    <div class="h-left">
+      <div class="h-icon">🎯</div>
+      <div>
+        <div class="h-title">Eğik Atış Simülasyonu</div>
+        <div class="h-sub">g = 10 m/s² · İz, vektörler, yörünge tahmini</div>
+      </div>
+    </div>
+    <div class="tabs" id="tabs">
+      <button class="tab on" data-scene="I">Bölüm I · Yatay Atış</button>
+      <button class="tab"    data-scene="II">Bölüm II · 37°</button>
+      <button class="tab"    data-scene="III">Bölüm III · 53°</button>
+    </div>
+  </header>
+
+  <div class="body">
+    <div class="cvs-wrap" id="cvs-wrap">
+      <canvas id="sim"></canvas>
+      <div class="g-badge">g = 10 m/s²</div>
+    </div>
+
+    <aside>
+
+      <div class="s-sec">
+        <div class="s-lbl">Kontroller</div>
+        <div class="btn-row">
+          <button class="btn btn-start" id="btnStart">▶ Başlat</button>
+          <button class="btn btn-pause" id="btnPause">⏸ Dur</button>
+          <button class="btn btn-reset" id="btnReset">↺ Sıfırla</button>
+        </div>
+        <div class="tgl-row">
+          <button class="tgl on" id="tVec">⇀ Vektörler</button>
+          <button class="tgl on" id="tPred">— Yörünge</button>
+        </div>
+      </div>
+
+      <div class="s-sec" id="secSliders">
+        <div class="s-lbl">Parametreler</div>
+        <div class="sl-row" id="rowSpeed">
+          <label>Hız (m/s) <span id="speedVal">50</span></label>
+          <input type="range" id="slSpeed" min="10" max="80" step="1" value="50">
+        </div>
+        <div class="sl-row" id="rowAngle" hidden>
+          <label>Açı (°) <span id="angleVal">37</span></label>
+          <input type="range" id="slAngle" min="10" max="80" step="1" value="37">
+        </div>
+        <div class="sl-row" id="rowHeight" hidden>
+          <label>Başlangıç Yüksekliği (m) <span id="heightVal">45</span></label>
+          <input type="range" id="slHeight" min="5" max="60" step="1" value="45">
+        </div>
+      </div>
+
+      <div class="s-sec">
+        <div class="s-lbl">Anlık Değerler</div>
+        <div class="stats-grid">
+          <div class="stat-card"><div class="stat-k">t (s)</div><div class="stat-v" id="stT">0.00</div></div>
+          <div class="stat-card"><div class="stat-k">x (m)</div><div class="stat-v" id="stX">0.00</div></div>
+          <div class="stat-card"><div class="stat-k">h (m)</div><div class="stat-v" id="stH">0.00</div></div>
+          <div class="stat-card"><div class="stat-k">|v| (m/s)</div><div class="stat-v" id="stV">0.00</div></div>
+          <div class="stat-card"><div class="stat-k">vₓ (m/s)</div><div class="stat-v" id="stVx" style="color:#22d3ee">0.00</div></div>
+          <div class="stat-card"><div class="stat-k">vᵧ (m/s)</div><div class="stat-v" id="stVy" style="color:#34d399">0.00</div></div>
+        </div>
+      </div>
+
+      <div class="s-sec">
+        <div class="s-lbl">Sonuç</div>
+        <div class="result-box" id="resultBox">
+          <div class="res-R" id="resR">R = — m</div>
+          <div class="res-T" id="resT">Toplam süre: — s</div>
+        </div>
+        <div style="color:var(--muted);font-size:.72rem;line-height:1.5;" id="noResult">
+          Cisim yere indikten sonra menzil ve süre burada görünecek.
+        </div>
+      </div>
+
+      <div class="s-sec">
+        <div class="s-lbl">Tam Saniyelerde Konum</div>
+        <div class="tbl-wrap">
+          <table>
+            <thead><tr><th>t (s)</th><th>x (m)</th><th>h (m)</th></tr></thead>
+            <tbody id="tblBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+    </aside>
+  </div>
+</div>
+
+<script>
+/* ── HELPERS ─────────────────────────────────────────── */
+const rad  = d => d * Math.PI / 180;
+const fmt  = n => (Math.round(n * 100) / 100).toFixed(2);
+const lerp = (a, b, t) => a + (b - a) * t;
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+
+/* ── DOM ─────────────────────────────────────────────── */
+const canvas   = document.getElementById('sim');
+const ctx      = canvas.getContext('2d');
+const cWrap    = document.getElementById('cvs-wrap');
+const btnStart = document.getElementById('btnStart');
+const btnPause = document.getElementById('btnPause');
+const btnReset = document.getElementById('btnReset');
+const tVec     = document.getElementById('tVec');
+const tPred    = document.getElementById('tPred');
+const tblBody  = document.getElementById('tblBody');
+
+/* ── CANVAS SIZE ─────────────────────────────────────── */
+const dpr = Math.min(window.devicePixelRatio || 1, 2);
+let W = 0, H = 0;
+function resizeCanvas() {
+  W = cWrap.clientWidth; H = cWrap.clientHeight;
+  canvas.width  = W * dpr; canvas.height = H * dpr;
+  canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+window.addEventListener('resize', () => { resizeCanvas(); draw(); });
+resizeCanvas();
+
+/* ── STARS ───────────────────────────────────────────── */
+const STARS = Array.from({length: 60}, () => ({
+  rx: Math.random(), ry: Math.random() * 0.72,
+  r: Math.random() * 1.1 + 0.3,
+  a: Math.random() * 0.55 + 0.15
+}));
+
+/* ── PHYSICS ─────────────────────────────────────────── */
+const G = 10;
+const SCENES = {
+  I:   { type: 'horizontal', v0: 40, h0: 45, angle: 0, allowAngle: false },
+  II:  { type: 'angled',     v0: 50, angle: 37, allowAngle: true },
+  III: { type: 'angled',     v0: 50, angle: 53, allowAngle: true }
+};
+
+let sceneKey = 'I';
+let showVec  = true;
+let showPred = true;
+
+const state = {
+  running: false, t: 0, dt: 1/60,
+  pos: {x:0, y:0}, vel: {x:0, y:0},
+  trail: [], tableMarks: new Set(),
+  worldW: 150,
+  camX: 0, viewHm: 60, targetHm: 60,
+  yOff: 0, targetYOff: 0,
+  land: { x: null, time: null, pulse: 0 }
+};
+
+function initKinematics() {
+  const sc  = SCENES[sceneKey];
+  const v0  = +document.getElementById('slSpeed').value;
+  const ang = sc.allowAngle ? rad(+document.getElementById('slAngle').value) : 0;
+  const h0  = sc.type === 'horizontal' ? +document.getElementById('slHeight').value : 0;
+
+  state.pos = { x: 5, y: h0 };
+  state.vel = {
+    x: sc.type === 'horizontal' ? v0 : v0 * Math.cos(ang),
+    y: sc.type === 'horizontal' ? 0  : v0 * Math.sin(ang)
+  };
+  state.t = 0;
+  state.trail = [];
+  state.tableMarks.clear();
+  tblBody.innerHTML = '';
+  state.camX = 0;
+  state.viewHm  = 60; state.targetHm  = 60;
+  state.yOff    = 0;  state.targetYOff = 0;
+  state.land = { x: null, time: null, pulse: 0 };
+
+  const { R } = predictLanding();
+  state.worldW = Math.max(100, R + 25);
+
+  document.getElementById('resultBox').classList.remove('show');
+  document.getElementById('noResult').style.display = '';
+  updateStats(0, state.pos.x, Math.max(0, state.pos.y),
+    Math.hypot(state.vel.x, state.vel.y), state.vel.x, state.vel.y);
+}
+
+function predictLanding() {
+  const sc  = SCENES[sceneKey];
+  const v0  = +document.getElementById('slSpeed').value;
+  const ang = sc.allowAngle ? rad(+document.getElementById('slAngle').value) : 0;
+  const h0  = sc.type === 'horizontal' ? +document.getElementById('slHeight').value : 0;
+  const x0  = 5;
+  if (sc.type === 'horizontal') {
+    const T = Math.sqrt(2 * h0 / G);
+    return { T, R: x0 + v0 * T };
+  } else {
+    const vx = v0 * Math.cos(ang), vy = v0 * Math.sin(ang);
+    const T  = (2 * vy) / G;
+    return { T, R: x0 + vx * T };
+  }
+}
+
+/* ── STEP ────────────────────────────────────────────── */
+function step() {
+  const dt = state.dt;
+  state.vel.y -= G * dt;
+  state.pos.x += state.vel.x * dt;
+  state.pos.y += state.vel.y * dt;
+  state.t += dt;
+
+  if (!state.trail.length || state.t - state.trail[state.trail.length - 1].t > 0.05) {
+    state.trail.push({ x: state.pos.x, y: state.pos.y, t: state.t });
+    if (state.trail.length > 3000) state.trail.shift();
+  }
+
+  if (state.pos.y <= 0) {
+    if (state.land.x === null) {
+      state.land.x    = state.pos.x;
+      state.land.time = state.t;
+      state.land.pulse = 1;
+      state.targetHm  = 90;
+      state.targetYOff = -110;
+      document.getElementById('resultBox').classList.add('show');
+      document.getElementById('noResult').style.display = 'none';
+      document.getElementById('resR').textContent = 'R = ' + fmt(state.pos.x) + ' m';
+      document.getElementById('resT').textContent = 'Toplam süre: ' + fmt(state.t) + ' s';
+    }
+    state.pos.y = 0;
+    state.running = false;
+    btnStart.textContent = '▶ Tekrar';
+  }
+
+  const sp = Math.hypot(state.vel.x, state.vel.y);
+  updateStats(state.t, state.pos.x, Math.max(0, state.pos.y), sp, state.vel.x, state.vel.y);
+
+  // Table
+  const k = Math.floor(state.t + 1e-6);
+  if (k >= 0 && !state.tableMarks.has(k) && Math.abs(state.t - k) < state.dt * 1.5) {
+    state.tableMarks.add(k);
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${k}</td><td>${fmt(state.pos.x)}</td><td>${fmt(Math.max(0, state.pos.y))}</td>`;
+    tblBody.appendChild(tr);
+    tblBody.scrollTop = tblBody.scrollHeight;
+  }
+}
+
+function updateStats(t, x, h, v, vx, vy) {
+  document.getElementById('stT').textContent  = fmt(t);
+  document.getElementById('stX').textContent  = fmt(x);
+  document.getElementById('stH').textContent  = fmt(h);
+  document.getElementById('stV').textContent  = fmt(v);
+  document.getElementById('stVx').textContent = fmt(vx);
+  document.getElementById('stVy').textContent = fmt(vy);
+}
+
+/* ── DRAW ────────────────────────────────────────────── */
+function draw() {
+  const pad = 18, ruleH = 70, topPad = 22;
+  state.viewHm = lerp(state.viewHm, state.targetHm, 0.09);
+  const scale   = (H - ruleH - topPad) / state.viewHm;
+  const viewWm  = (W - pad * 2) / scale;
+  const pr      = predictLanding();
+  const targetCamX = state.land.x === null
+    ? clamp(state.pos.x - viewWm * 0.35, 0, Math.max(0, state.worldW - viewWm))
+    : clamp(state.land.x - viewWm * 0.5, 0, Math.max(0, state.worldW - viewWm));
+  state.camX = lerp(state.camX, targetCamX, 0.12);
+  state.yOff = lerp(state.yOff, state.targetYOff, 0.15);
+
+  const Xc = m => pad + (m - state.camX) * scale;
+  const Yc = m => (H - ruleH - m * scale) + state.yOff;
+  const groundY = Yc(0);
+
+  ctx.clearRect(0, 0, W, H);
+
+  /* Sky */
+  const sky = ctx.createLinearGradient(0, 0, 0, groundY);
+  sky.addColorStop(0,   '#020817');
+  sky.addColorStop(0.5, '#0c1a3a');
+  sky.addColorStop(1,   '#0f2d58');
+  ctx.fillStyle = sky;
+  ctx.fillRect(0, 0, W, groundY);
+
+  /* Stars */
+  STARS.forEach(s => {
+    ctx.beginPath();
+    ctx.arc(s.rx * W, s.ry * H, s.r, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(255,255,255,${s.a})`;
+    ctx.fill();
+  });
+
+  /* Ground */
+  const grd = ctx.createLinearGradient(0, groundY, 0, H);
+  grd.addColorStop(0,   '#166534');
+  grd.addColorStop(0.2, '#14532d');
+  grd.addColorStop(1,   '#0a1f14');
+  ctx.fillStyle = grd;
+  ctx.fillRect(0, groundY, W, H - groundY);
+
+  /* Ground line */
+  ctx.beginPath(); ctx.moveTo(0, groundY); ctx.lineTo(W, groundY);
+  ctx.strokeStyle = '#22c55e'; ctx.lineWidth = 2; ctx.stroke();
+
+  /* Distance markers */
+  ctx.font = '9px Space Grotesk, sans-serif';
+  ctx.textAlign = 'center';
+  const mStart = Math.floor(state.camX / 10) * 10;
+  for (let m = mStart; m <= mStart + viewWm + 10; m += 10) {
+    const mx = Xc(m);
+    if (mx < 0 || mx > W) continue;
+    ctx.beginPath(); ctx.moveTo(mx, groundY); ctx.lineTo(mx, groundY + 7);
+    ctx.strokeStyle = 'rgba(74,222,128,0.3)'; ctx.lineWidth = 1; ctx.stroke();
+    ctx.fillStyle = 'rgba(74,222,128,0.35)';
+    ctx.fillText(m + 'm', mx, groundY + 16);
+  }
+
+  /* Platform (Scene I) */
+  if (SCENES[sceneKey].type === 'horizontal') {
+    const h0 = +document.getElementById('slHeight').value;
+    const platX = Xc(0), platW = 6 * scale;
+    const platGrd = ctx.createLinearGradient(0, Yc(h0), 0, groundY);
+    platGrd.addColorStop(0, '#78350f');
+    platGrd.addColorStop(1, '#1c0a02');
+    ctx.fillStyle = platGrd;
+    ctx.fillRect(platX, Yc(h0), platW, groundY - Yc(h0));
+    ctx.beginPath(); ctx.moveTo(platX, Yc(h0)); ctx.lineTo(platX + platW, Yc(h0));
+    ctx.strokeStyle = 'rgba(251,191,36,0.6)'; ctx.lineWidth = 2; ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(platX + platW, Yc(h0)); ctx.lineTo(platX + platW, groundY);
+    ctx.strokeStyle = 'rgba(251,191,36,0.3)'; ctx.lineWidth = 1; ctx.stroke();
+  }
+
+  /* Launch angle arc */
+  if (SCENES[sceneKey].type === 'angled' && state.t < 0.5) {
+    const ang = rad(+document.getElementById('slAngle').value);
+    const lx  = Xc(5), ly = Yc(0);
+    ctx.save();
+    ctx.strokeStyle = 'rgba(168,85,247,0.7)';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.arc(lx, ly, 38, -ang, 0);
+    ctx.stroke();
+    ctx.fillStyle = 'rgba(192,132,252,0.9)';
+    ctx.font = 'bold 10px Space Grotesk';
+    ctx.textAlign = 'center';
+    const midA = ang / 2;
+    ctx.fillText(Math.round(ang * 180 / Math.PI) + '°',
+      lx + 50 * Math.cos(midA), ly - 50 * Math.sin(midA));
+    ctx.restore();
+  }
+
+  /* Predicted trajectory */
+  if (showPred && state.land.x === null) {
+    ctx.save();
+    ctx.setLineDash([5, 9]);
+    ctx.strokeStyle = 'rgba(251,146,60,0.22)';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    let px = state.pos.x, py = Math.max(0, state.pos.y);
+    let pvx = state.vel.x, pvy = state.vel.y;
+    let first = true;
+    for (let i = 0; i < 6000; i++) {
+      const sx = Xc(px), sy = Yc(Math.max(0, py));
+      if (first) { ctx.moveTo(sx, sy); first = false; }
+      else ctx.lineTo(sx, sy);
+      pvy -= G * 0.04; px += pvx * 0.04; py += pvy * 0.04;
+      if (py <= 0) { ctx.lineTo(Xc(px), Yc(0)); break; }
+    }
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.restore();
+  }
+
+  /* Trail */
+  ctx.save();
+  state.trail.forEach((p, i) => {
+    const sx = Xc(p.x), sy = Yc(p.y);
+    if (sx < -10 || sx > W + 10) return;
+    const age = (i / state.trail.length);
+    const isSecond = state.tableMarks.has(Math.round(p.t)) && Math.abs(p.t - Math.round(p.t)) < 0.06;
+    if (isSecond) {
+      ctx.beginPath();
+      ctx.arc(sx, sy, 4, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(251,191,36,${age * 0.85})`;
+      ctx.fill();
+    } else {
+      ctx.beginPath();
+      ctx.arc(sx, sy, 2, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(251,146,60,${age * 0.55})`;
+      ctx.fill();
+    }
+  });
+  ctx.restore();
+
+  /* R Flag */
+  const rx   = Xc(pr.R);
+  const fh   = 60, fw = 22, fy = Yc(0);
+  ctx.save();
+  ctx.strokeStyle = 'rgba(99,102,241,0.7)'; ctx.lineWidth = 1.5;
+  ctx.setLineDash([5, 4]);
+  ctx.beginPath(); ctx.moveTo(rx, fy); ctx.lineTo(rx, fy - fh + 10); ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.fillStyle = 'rgba(249,115,22,.95)';
+  ctx.beginPath();
+  ctx.moveTo(rx, fy - fh);
+  ctx.lineTo(rx + fw, fy - fh + fw * 0.45);
+  ctx.lineTo(rx, fy - fh + fw * 0.9);
+  ctx.closePath(); ctx.fill();
+  ctx.font = '600 10px Space Grotesk';
+  ctx.fillStyle = '#e2e8f0'; ctx.textAlign = 'center';
+  ctx.fillText('R = ' + fmt(pr.R) + ' m', rx + fw * 0.5, fy - fh - 6);
+  ctx.restore();
+
+  /* Land pulse ring */
+  if (state.land.x !== null && state.land.pulse > 0.01) {
+    const pr2 = (1 - state.land.pulse) * 8 + state.land.pulse * 48;
+    ctx.save();
+    ctx.strokeStyle = `rgba(249,115,22,${(1 - state.land.pulse) * 0.9})`;
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    ctx.arc(Xc(state.land.x), Yc(0), pr2, Math.PI, 0);
+    ctx.stroke();
+    ctx.restore();
+    state.land.pulse *= 0.91;
+  }
+
+  /* Ball shadow */
+  const bx = Xc(state.pos.x), by = Yc(Math.max(0, state.pos.y));
+  const shadowAlpha = Math.max(0, 1 - state.pos.y / 80) * 0.35;
+  ctx.save();
+  ctx.beginPath();
+  ctx.ellipse(bx, groundY, 8, 3, 0, 0, Math.PI * 2);
+  ctx.fillStyle = `rgba(0,0,0,${shadowAlpha})`;
+  ctx.fill();
+  ctx.restore();
+
+  /* Velocity vectors */
+  if (showVec && (Math.abs(state.vel.x) > 0.1 || Math.abs(state.vel.y) > 0.1)) {
+    const arrowPx = scale * 0.25;
+    const vx = state.vel.x, vy = state.vel.y;
+    drawArrow(ctx, bx, by, bx + vx * arrowPx,    by,              '#22d3ee', 'Vₓ=' + fmt(vx));
+    drawArrow(ctx, bx, by, bx,                    by - vy * arrowPx, vy >= 0 ? '#34d399' : '#f87171', 'Vᵧ=' + fmt(vy));
+    drawArrow(ctx, bx, by, bx + vx * arrowPx,    by - vy * arrowPx, '#fbbf24', '');
+  }
+
+  /* Ball */
+  const ballR = 8;
+  const ballGrd = ctx.createRadialGradient(bx - 2.5, by - 2.5, 0.5, bx, by, ballR);
+  ballGrd.addColorStop(0, '#fef08a');
+  ballGrd.addColorStop(0.6, '#fb923c');
+  ballGrd.addColorStop(1, '#b45309');
+  const glow = ctx.createRadialGradient(bx, by, 0, bx, by, ballR * 3.5);
+  glow.addColorStop(0, 'rgba(249,115,22,0.35)');
+  glow.addColorStop(1, 'transparent');
+  ctx.beginPath(); ctx.arc(bx, by, ballR * 3.5, 0, Math.PI * 2);
+  ctx.fillStyle = glow; ctx.fill();
+  ctx.beginPath(); ctx.arc(bx, by, ballR, 0, Math.PI * 2);
+  ctx.fillStyle = ballGrd; ctx.fill();
+  ctx.strokeStyle = 'rgba(255,255,255,0.3)'; ctx.lineWidth = 1.2; ctx.stroke();
+
+  /* Max height indicator */
+  if (state.running && state.vel.y < 0 && state.pos.y > 2) {
+    ctx.save();
+    ctx.setLineDash([4, 6]);
+    ctx.strokeStyle = 'rgba(168,85,247,0.4)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(pad, by); ctx.lineTo(W - pad, by);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.font = '9px Space Grotesk'; ctx.fillStyle = 'rgba(192,132,252,0.7)';
+    ctx.textAlign = 'left';
+    ctx.fillText('h = ' + fmt(state.pos.y) + ' m', pad + 4, by - 4);
+    ctx.restore();
+  }
+}
+
+/* Arrow helper */
+function drawArrow(ctx, x1, y1, x2, y2, color, label) {
+  const dx = x2 - x1, dy = y2 - y1;
+  const len = Math.sqrt(dx*dx + dy*dy);
+  if (len < 6) return;
+  const ux = dx/len, uy = dy/len;
+  const hl = Math.min(8, len * 0.35), ha = 0.42;
+  ctx.save();
+  ctx.strokeStyle = color; ctx.lineWidth = 2; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2 - ux*hl, y2 - uy*hl); ctx.stroke();
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.moveTo(x2, y2);
+  ctx.lineTo(x2 - hl*(ux*Math.cos(ha)-uy*Math.sin(ha)), y2 - hl*(uy*Math.cos(ha)+ux*Math.sin(ha)));
+  ctx.lineTo(x2 - hl*(ux*Math.cos(-ha)-uy*Math.sin(-ha)), y2 - hl*(uy*Math.cos(-ha)+ux*Math.sin(-ha)));
+  ctx.closePath(); ctx.fill();
+  if (label) {
+    ctx.font = '700 9px Space Grotesk, sans-serif';
+    ctx.fillStyle = color; ctx.textAlign = 'center';
+    ctx.fillText(label, (x1 + x2) / 2 + (dy < 0 ? -22 : 0), (y1 + y2) / 2 + (dx > 0 ? -5 : 10));
+  }
+  ctx.restore();
+}
+
+/* ── ANIMATION LOOP ──────────────────────────────────── */
+function loop() {
+  if (state.running) step();
+  draw();
+  requestAnimationFrame(loop);
+}
+loop();
+
+/* ── TAB HANDLING ────────────────────────────────────── */
+document.getElementById('tabs').addEventListener('click', e => {
+  const tab = e.target.closest('.tab');
+  if (!tab) return;
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('on'));
+  tab.classList.add('on');
+  sceneKey = tab.dataset.scene;
+  loadScene();
+});
+
+function loadScene() {
+  const sc = SCENES[sceneKey];
+  document.getElementById('rowAngle').hidden  = !sc.allowAngle;
+  document.getElementById('rowHeight').hidden = sc.type !== 'horizontal';
+  document.getElementById('slSpeed').value = sc.v0;
+  document.getElementById('speedVal').textContent = sc.v0;
+  document.getElementById('slAngle').value = sc.angle || 37;
+  document.getElementById('angleVal').textContent = (sc.angle || 37) + '°';
+  document.getElementById('slHeight').value = sc.h0 || 45;
+  document.getElementById('heightVal').textContent = (sc.h0 || 45) + ' m';
+  reset();
+}
+
+/* ── CONTROLS ────────────────────────────────────────── */
+btnStart.addEventListener('click', () => {
+  if (!state.running) {
+    if (state.t === 0 || state.pos.y <= 0) reset();
+    state.running = true;
+    btnStart.textContent = '▶ Devam';
+  }
+});
+btnPause.addEventListener('click', () => {
+  state.running = false;
+  btnStart.textContent = '▶ Devam';
+});
+btnReset.addEventListener('click', reset);
+
+function reset() {
+  state.running = false;
+  btnStart.textContent = '▶ Başlat';
+  initKinematics();
+}
+
+/* Sliders */
+document.getElementById('slSpeed').addEventListener('input', function() {
+  document.getElementById('speedVal').textContent = this.value;
+  reset();
+});
+document.getElementById('slAngle').addEventListener('input', function() {
+  document.getElementById('angleVal').textContent = this.value + '°';
+  reset();
+});
+document.getElementById('slHeight').addEventListener('input', function() {
+  document.getElementById('heightVal').textContent = this.value + ' m';
+  reset();
+});
+
+/* Toggles */
+tVec.addEventListener('click', function() {
+  showVec = !showVec;
+  this.classList.toggle('on', showVec);
+});
+tPred.addEventListener('click', function() {
+  showPred = !showPred;
+  this.classList.toggle('on', showPred);
+});
+
+/* ── INIT ────────────────────────────────────────────── */
+loadScene();
+</script>
+</body>
+</html>

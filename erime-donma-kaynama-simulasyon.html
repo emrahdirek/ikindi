@@ -1,0 +1,987 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Erime – Donma – Kaynama Simülasyonu</title>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg:      #070c1a;
+      --surface: rgba(255,255,255,0.04);
+      --surf2:   rgba(255,255,255,0.07);
+      --border:  rgba(255,255,255,0.08);
+      --text:    #e2e8f0;
+      --muted:   #64748b;
+      --sidebar: 268px;
+    }
+    html, body {
+      height: 100%; overflow: hidden;
+      font-family: 'Space Grotesk', system-ui, sans-serif;
+      background: var(--bg); color: var(--text);
+    }
+    .layout { display: flex; flex-direction: column; height: 100vh; }
+
+    /* HEADER */
+    header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0 18px; height: 54px; flex-shrink: 0;
+      background: rgba(7,12,26,0.95); border-bottom: 1px solid var(--border);
+      backdrop-filter: blur(20px); z-index: 20; gap: 12px;
+    }
+    .h-left { display: flex; align-items: center; gap: 10px; }
+    .h-icon {
+      width: 32px; height: 32px;
+      background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+      border-radius: 8px; display: grid; place-items: center; font-size: 16px;
+    }
+    .h-title { font-size: .88rem; font-weight: 700; }
+    .h-sub   { font-size: .63rem; color: var(--muted); }
+    .h-info  {
+      padding: 5px 12px; background: rgba(59,130,246,.12);
+      border: 1px solid rgba(59,130,246,.25); border-radius: 20px;
+      font-size: .72rem; color: #93c5fd; font-weight: 600;
+    }
+
+    /* BODY */
+    .body { flex: 1; display: flex; overflow: hidden; min-height: 0; }
+
+    /* SIDEBAR */
+    aside {
+      width: var(--sidebar); flex-shrink: 0; display: flex; flex-direction: column;
+      border-right: 1px solid var(--border); background: rgba(255,255,255,0.015);
+      overflow-y: auto; overflow-x: hidden;
+    }
+    aside::-webkit-scrollbar { width: 3px; }
+    aside::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+    .s-sec { padding: 14px; }
+    .s-sec + .s-sec { border-top: 1px solid var(--border); }
+    .s-lbl {
+      font-size: .62rem; font-weight: 700; color: var(--muted);
+      text-transform: uppercase; letter-spacing: .1em; margin-bottom: 10px;
+    }
+
+    /* Material cards */
+    .mat-grid { display: flex; flex-direction: column; gap: 6px; }
+    .mat-card {
+      display: flex; align-items: center; gap: 12px;
+      padding: 11px 13px; background: var(--surface);
+      border: 1px solid var(--border); border-radius: 11px;
+      cursor: pointer; transition: all .18s;
+    }
+    .mat-card:hover { background: var(--surf2); }
+    .mat-card.on {
+      border-color: var(--mc, #38bdf8); color: var(--mc, #38bdf8);
+      background: rgba(255,255,255,0.05);
+      box-shadow: 0 0 16px -6px var(--mc, #38bdf8);
+    }
+    .mat-icon { font-size: 1.5rem; flex-shrink: 0; }
+    .mat-name { font-size: .84rem; font-weight: 600; }
+    .mat-rng  { font-size: .68rem; color: var(--muted); margin-top: 1px; }
+    .mat-card.on .mat-rng { color: var(--mc); opacity: .6; }
+
+    /* Table */
+    table { width: 100%; border-collapse: collapse; }
+    thead th {
+      font-size: .62rem; font-weight: 700; color: var(--muted); text-transform: uppercase;
+      letter-spacing: .06em; padding: 5px 6px; border-bottom: 1px solid var(--border);
+      text-align: center;
+    }
+    tbody td, tbody th {
+      padding: 7px 6px; font-size: .75rem; border-bottom: 1px solid rgba(255,255,255,.04);
+      text-align: center;
+    }
+    tbody th { color: var(--muted); font-weight: 600; text-align: left; }
+    .tval { font-weight: 700; font-family: 'Courier New', monospace; color: var(--text); }
+    .tval.reveal { color: #34d399; }
+
+    /* Phase bar */
+    .phase-bar {
+      background: rgba(0,0,0,.2); border: 1px solid var(--border);
+      border-radius: 10px; padding: 12px;
+    }
+    .pbar-track {
+      display: flex; height: 10px; border-radius: 5px; overflow: hidden; margin: 8px 0 6px;
+    }
+    .pbar-seg { flex: 1; transition: opacity .3s; }
+    .pbar-labels { display: flex; justify-content: space-between; font-size: .65rem; color: var(--muted); }
+    .pbar-marker {
+      width: 12px; height: 12px; border-radius: 50%; margin: 0 auto;
+      background: white; box-shadow: 0 0 6px 2px rgba(255,255,255,.4);
+      transition: margin-left .3s;
+    }
+    .phase-badge {
+      display: inline-flex; align-items: center; gap: 5px;
+      padding: 5px 11px; border-radius: 20px; font-size: .75rem; font-weight: 700;
+      margin-top: 8px;
+    }
+
+    /* Sliders */
+    .sl-row { margin-bottom: 10px; }
+    .sl-row label { display: flex; justify-content: space-between; font-size: .72rem; color: var(--muted); margin-bottom: 6px; }
+    .sl-row label span { color: var(--text); font-weight: 700; }
+    input[type=range] {
+      width: 100%; appearance: none; height: 5px;
+      background: rgba(255,255,255,.1); border-radius: 4px; outline: none; cursor: pointer;
+    }
+    input[type=range]::-webkit-slider-thumb {
+      appearance: none; width: 16px; height: 16px; border-radius: 50%;
+      background: #60a5fa; box-shadow: 0 0 8px rgba(96,165,250,.5); cursor: grab;
+    }
+
+    /* Buttons */
+    .btn-row { display: flex; gap: 7px; margin-bottom: 10px; }
+    .btn {
+      flex: 1; padding: 9px 6px; border: 1px solid var(--border);
+      border-radius: 9px; font-family: inherit; font-size: .78rem; font-weight: 700;
+      cursor: pointer; transition: all .18s; text-align: center;
+    }
+    .btn-pause { background: var(--surface); color: var(--text); }
+    .btn-pause:hover { background: var(--surf2); }
+    .btn-reset { background: rgba(239,68,68,.12); border-color: rgba(239,68,68,.3); color: #f87171; }
+    .btn-reset:hover { background: rgba(239,68,68,.22); }
+
+    /* Readouts */
+    .readout-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+    .rout {
+      background: rgba(0,0,0,.2); border: 1px solid var(--border);
+      border-radius: 8px; padding: 8px 10px;
+    }
+    .rout-k { font-size: .62rem; color: var(--muted); font-weight: 600; margin-bottom: 2px; }
+    .rout-v { font-size: 1rem; font-weight: 800; font-family: 'Courier New', monospace; }
+
+    /* MAIN AREA */
+    .main-area {
+      flex: 1; display: flex; flex-direction: column; overflow: hidden; min-width: 0;
+    }
+    .canvas-wrap {
+      flex: 1; position: relative; overflow: hidden; min-height: 0;
+    }
+    #beaker { display: block; }
+    .graph-wrap {
+      height: 130px; flex-shrink: 0;
+      border-top: 1px solid var(--border);
+      position: relative;
+    }
+    #graph { display: block; }
+    .graph-label {
+      position: absolute; top: 6px; left: 10px;
+      font-size: .62rem; color: var(--muted); font-weight: 700; text-transform: uppercase; letter-spacing: .06em;
+    }
+
+    /* MOBILE */
+    @media (max-width: 700px) {
+      :root { --sidebar: 100%; }
+      .body { flex-direction: column; }
+      aside { width: 100%; border-right: none; border-bottom: 1px solid var(--border); max-height: 38vh; flex-shrink: 0; }
+      .canvas-wrap { min-height: 200px; }
+      .graph-wrap { height: 100px; }
+    }
+  </style>
+</head>
+<body>
+<div class="layout">
+
+  <header>
+    <div class="h-left">
+      <div class="h-icon">🔬</div>
+      <div>
+        <div class="h-title">Erime – Donma – Kaynama Simülasyonu</div>
+        <div class="h-sub">Faz geçişleri · Isıtma eğrisi · Plateau gözlemi</div>
+      </div>
+    </div>
+    <div class="h-info">Eğitim Simülasyonu</div>
+  </header>
+
+  <div class="body">
+
+    <!-- SIDEBAR -->
+    <aside>
+
+      <div class="s-sec">
+        <div class="s-lbl">Madde Seç</div>
+        <div class="mat-grid" id="matGrid"></div>
+      </div>
+
+      <div class="s-sec">
+        <div class="s-lbl">Erime & Kaynama Noktaları</div>
+        <table>
+          <thead>
+            <tr><th></th><th>Erime (°C)</th><th>Kaynama (°C)</th></tr>
+          </thead>
+          <tbody id="tblBody"></tbody>
+        </table>
+      </div>
+
+      <div class="s-sec">
+        <div class="s-lbl">Faz Durumu</div>
+        <div class="phase-bar">
+          <div class="pbar-track" id="pbarTrack"></div>
+          <div class="pbar-labels"><span>Katı</span><span>Sıvı</span><span>Gaz</span></div>
+          <div id="phaseBadge" class="phase-badge" style="background:rgba(147,197,253,.12);color:#93c5fd;">⬡ Katı</div>
+        </div>
+      </div>
+
+      <div class="s-sec">
+        <div class="s-lbl">Kontroller</div>
+        <div class="btn-row">
+          <button class="btn btn-pause" id="btnPause">⏸ Durdur</button>
+          <button class="btn btn-reset" id="btnReset">↺ Sıfırla</button>
+        </div>
+        <div class="sl-row">
+          <label>Isıtma Gücü <span id="powerVal">+60</span></label>
+          <input type="range" id="slPower" min="-100" max="100" value="60">
+        </div>
+      </div>
+
+      <div class="s-sec">
+        <div class="s-lbl">Anlık Değerler</div>
+        <div class="readout-grid">
+          <div class="rout"><div class="rout-k">Sıcaklık</div><div class="rout-v" id="rTemp" style="color:#38bdf8">0 °C</div></div>
+          <div class="rout"><div class="rout-k">Durum</div><div class="rout-v" id="rPhase" style="color:#a5b4fc">Katı</div></div>
+          <div class="rout"><div class="rout-k">Güç</div><div class="rout-v" id="rPow" style="color:#fb923c">+60%</div></div>
+          <div class="rout"><div class="rout-k">Plateau</div><div class="rout-v" id="rPlat" style="color:#34d399">—</div></div>
+        </div>
+      </div>
+
+    </aside>
+
+    <!-- MAIN AREA -->
+    <div class="main-area">
+      <div class="canvas-wrap" id="cvs-wrap">
+        <canvas id="beaker"></canvas>
+      </div>
+      <div class="graph-wrap" id="graph-wrap">
+        <div class="graph-label">Sıcaklık – Zaman Grafiği (Isıtma Eğrisi)</div>
+        <canvas id="graph"></canvas>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+/* ── MATERIAL DATA ───────────────────────────────────── */
+const MAT = {
+  ice:  {
+    id:'ice',  name:'Buz (H₂O)', icon:'❄️',
+    melt:0, boil:100, start:-20, range:[-50, 150],
+    css:'#38bdf8',
+    sc:['#bfdbfe','#93c5fd'], lc:['#3b82f6','#1d4ed8'], vc:['#bae6fd','#e0f2fe']
+  },
+  iron: {
+    id:'iron', name:'Demir (Fe)', icon:'⚙️',
+    melt:1538, boil:3023, start:100, range:[0, 3200],
+    css:'#fb923c',
+    sc:['#cbd5e1','#94a3b8'], lc:['#f97316','#b45309'], vc:['#fca5a5','#fef2f2']
+  },
+  naph: {
+    id:'naph', name:'Naftalin (C₁₀H₈)', icon:'🧪',
+    melt:80, boil:218, start:20, range:[0, 280],
+    css:'#fbbf24',
+    sc:['#fef9c3','#fde68a'], lc:['#f59e0b','#b45309'], vc:['#fefce8','#fef9c3']
+  }
+};
+const MAT_KEYS = ['ice','iron','naph'];
+
+/* ── STATE ───────────────────────────────────────────── */
+let matKey = 'ice';
+let T   = MAT.ice.start;
+let phase = 'solid';    // solid | liquid | gas
+let guc   = 60;
+let paused = false;
+let pEr = 0, pKay = 0, pDon = 0, pYog = 0;
+
+const tempHistory = [];  // {T, phase}
+let   histTick = 0;
+
+// Revealed table values
+const revealed = { ice:{m:false,b:false}, iron:{m:false,b:false}, naph:{m:false,b:false} };
+
+/* ── PARTICLES ───────────────────────────────────────── */
+const particles = [];
+function spawnBubble(bx, by, bw, bh) {
+  particles.push({
+    type:'bubble',
+    x: bx + 15 + Math.random() * (bw - 30),
+    y: by + bh - 10,
+    r: 1.5 + Math.random() * 3,
+    vx: (Math.random() - .5) * .4,
+    vy: -(0.5 + Math.random() * 1.5),
+    alpha: 0.5 + Math.random() * .4,
+    life: 1
+  });
+}
+function spawnSteam(bx, by, bw) {
+  particles.push({
+    type:'steam',
+    x: bx + 20 + Math.random() * (bw - 40),
+    y: by,
+    r: 6 + Math.random() * 8,
+    vx: (Math.random() - .5) * .7,
+    vy: -(0.6 + Math.random() * 1.2),
+    life: 1
+  });
+}
+function updateParticles(dt, bx, by, bw, bh, M) {
+  // spawn
+  if (phase === 'liquid' && T >= M.boil - 15 && !paused) {
+    if (Math.random() < .35) spawnBubble(bx, by, bw, bh);
+  }
+  if (phase === 'gas' && !paused) {
+    if (Math.random() < .45) spawnSteam(bx, by, bw);
+  }
+  if ((pKay > 0 && pKay < 1) && !paused) {
+    if (Math.random() < .2) spawnBubble(bx, by, bw, bh);
+  }
+  // update
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    p.x += p.vx;
+    p.y += p.vy;
+    if (p.type === 'steam') {
+      p.r  += dt * 18;
+      p.life -= dt * 1.1;
+      p.alpha = p.life * 0.22;
+    } else {
+      p.life -= dt * 0.4;
+      p.alpha = p.life * 0.6;
+    }
+    if (p.life <= 0 || p.y < by - 80) particles.splice(i, 1);
+  }
+}
+
+/* ── BEAKER CANVAS ───────────────────────────────────── */
+const beakerCvs = document.getElementById('beaker');
+const bCtx      = beakerCvs.getContext('2d');
+const cWrap     = document.getElementById('cvs-wrap');
+const dpr       = Math.min(window.devicePixelRatio || 1, 2);
+let BW = 0, BH = 0;
+
+function resizeBeaker() {
+  BW = cWrap.clientWidth; BH = cWrap.clientHeight;
+  beakerCvs.width  = BW * dpr; beakerCvs.height = BH * dpr;
+  beakerCvs.style.width = BW + 'px'; beakerCvs.style.height = BH + 'px';
+  bCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+
+/* ── GRAPH CANVAS ────────────────────────────────────── */
+const graphCvs = document.getElementById('graph');
+const gCtx     = graphCvs.getContext('2d');
+const gWrap    = document.getElementById('graph-wrap');
+let GW = 0, GH = 0;
+
+function resizeGraph() {
+  GW = gWrap.clientWidth; GH = gWrap.clientHeight;
+  graphCvs.width  = GW * dpr; graphCvs.height = GH * dpr;
+  graphCvs.style.width = GW + 'px'; graphCvs.style.height = GH + 'px';
+  gCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+
+window.addEventListener('resize', () => { resizeBeaker(); resizeGraph(); });
+resizeBeaker(); resizeGraph();
+
+/* ── DRAW BEAKER SCENE ───────────────────────────────── */
+let waveT = 0;
+function drawScene() {
+  const M  = MAT[matKey];
+  bCtx.clearRect(0, 0, BW, BH);
+
+  // Background
+  const bg = bCtx.createLinearGradient(0, 0, 0, BH);
+  bg.addColorStop(0, '#0a1628');
+  bg.addColorStop(1, '#070c1a');
+  bCtx.fillStyle = bg;
+  bCtx.fillRect(0, 0, BW, BH);
+
+  // Lab grid
+  bCtx.save();
+  bCtx.strokeStyle = 'rgba(255,255,255,.025)';
+  bCtx.lineWidth = 1;
+  for (let x = 0; x < BW; x += 50) { bCtx.beginPath(); bCtx.moveTo(x, 0); bCtx.lineTo(x, BH); bCtx.stroke(); }
+  for (let y = 0; y < BH; y += 50) { bCtx.beginPath(); bCtx.moveTo(0, y); bCtx.lineTo(BW, y); bCtx.stroke(); }
+  bCtx.restore();
+
+  // Beaker dimensions
+  const bw = Math.min(200, BW * 0.35);
+  const bh = Math.min(280, BH * 0.68);
+  const bx = BW * 0.38 - bw / 2;
+  const by = (BH - bh) / 2 - 20;
+
+  // Heater glow
+  drawHeater(bx, by + bh, bw, guc);
+
+  // Contents (clipped to beaker interior)
+  bCtx.save();
+  bCtx.beginPath();
+  bCtx.rect(bx + 5, by + 5, bw - 10, bh - 5);
+  bCtx.clip();
+  drawContents(bx, by, bw, bh, M);
+  particles.forEach(p => drawParticle(p, M));
+  bCtx.restore();
+
+  // Glass beaker
+  drawGlass(bx, by, bw, bh);
+
+  // Thermometer (right of beaker)
+  const tx = bx + bw + 32, th = bh + 30, ty = by - 15;
+  drawThermometer(tx, ty, th, T, M);
+
+  // Digital display
+  drawDisplay(bx + bw / 2, by - 28, T, M);
+
+  // Lab stand hint
+  bCtx.save();
+  bCtx.fillStyle = 'rgba(148,163,184,.12)';
+  bCtx.fillRect(bx - 12, by + bh + 35, bw + 24, 5);
+  bCtx.restore();
+}
+
+function drawHeater(bx, by, bw, power) {
+  const intensity = Math.abs(power) / 100;
+  const isHot  = power > 0;
+  const color  = isHot ? [239, 68, 68] : [59, 130, 246];
+  const grd = bCtx.createRadialGradient(bx + bw/2, by + 20, 0, bx + bw/2, by + 20, bw * 0.8);
+  grd.addColorStop(0, `rgba(${color.join(',')},${intensity * 0.5})`);
+  grd.addColorStop(1, 'transparent');
+  bCtx.fillStyle = grd;
+  bCtx.fillRect(bx - 30, by, bw + 60, 50);
+  // Coil
+  bCtx.save();
+  bCtx.strokeStyle = `rgba(${color.join(',')},${0.3 + intensity * 0.5})`;
+  bCtx.lineWidth = 3;
+  bCtx.lineCap = 'round';
+  bCtx.beginPath();
+  for (let i = 0; i < 8; i++) {
+    const x1 = bx + (i / 8) * bw;
+    const x2 = bx + ((i + 0.5) / 8) * bw;
+    bCtx.moveTo(x1, by + 18);
+    bCtx.quadraticCurveTo((x1 + x2) / 2, by + 6, x2, by + 18);
+  }
+  bCtx.stroke();
+  bCtx.restore();
+}
+
+function drawContents(bx, by, bw, bh, M) {
+  const liqFrac = 0.58; // liquid fills 58% of beaker
+  const liqY    = by + bh * (1 - liqFrac);
+  const ratio   = Math.max(0, Math.min(1, (T - M.range[0]) / (M.range[1] - M.range[0])));
+
+  if (phase === 'solid') {
+    const meltProg = pEr;
+    // Solid block
+    const solidH = (bh - 10) * 0.55 * (1 - meltProg * 0.6);
+    const sy = by + bh - solidH;
+    const grad = bCtx.createLinearGradient(0, sy, 0, by + bh);
+    grad.addColorStop(0, M.sc[0]);
+    grad.addColorStop(1, M.sc[1]);
+    bCtx.fillStyle = grad;
+    bCtx.fillRect(bx + 5, sy, bw - 10, solidH);
+    // Crystal pattern
+    drawCrystals(bx + 5, sy, bw - 10, solidH, M);
+    // Thin liquid layer during melting
+    if (meltProg > 0.05) {
+      const llH = meltProg * 35;
+      const llGrd = bCtx.createLinearGradient(0, sy - llH, 0, sy);
+      llGrd.addColorStop(0, M.lc[0] + '88');
+      llGrd.addColorStop(1, M.lc[1] + 'bb');
+      bCtx.fillStyle = llGrd;
+      bCtx.fillRect(bx + 5, sy - llH, bw - 10, llH);
+    }
+  } else if (phase === 'liquid') {
+    // Liquid body
+    const lGrd = bCtx.createLinearGradient(0, liqY, 0, by + bh);
+    lGrd.addColorStop(0, M.lc[0] + 'bb');
+    lGrd.addColorStop(1, M.lc[1] + 'dd');
+    bCtx.fillStyle = lGrd;
+    bCtx.fillRect(bx + 5, liqY, bw - 10, bh - (liqY - by) - 5);
+    // Animated surface
+    bCtx.beginPath();
+    for (let xi = 0; xi <= bw - 10; xi += 2) {
+      const wx = bx + 5 + xi;
+      const wy = liqY + Math.sin((xi / (bw - 10)) * Math.PI * 3 + waveT * 2.2) * 2.5;
+      xi === 0 ? bCtx.moveTo(wx, wy) : bCtx.lineTo(wx, wy);
+    }
+    bCtx.lineTo(bx + bw - 5, by + bh - 5);
+    bCtx.lineTo(bx + 5, by + bh - 5);
+    bCtx.closePath();
+    bCtx.fillStyle = M.lc[0] + 'cc';
+    bCtx.fill();
+    // Shimmer
+    bCtx.beginPath();
+    for (let xi = 0; xi <= bw - 10; xi += 2) {
+      const wx = bx + 5 + xi;
+      const wy = liqY + Math.sin((xi / (bw - 10)) * Math.PI * 3 + waveT * 2.2) * 2.5;
+      xi === 0 ? bCtx.moveTo(wx, wy) : bCtx.lineTo(wx, wy);
+    }
+    bCtx.strokeStyle = M.sc[0] + '88';
+    bCtx.lineWidth = 1.2;
+    bCtx.stroke();
+    // Iron glow
+    if (matKey === 'iron' && phase === 'liquid') {
+      const glow = bCtx.createRadialGradient(bx + bw/2, by + bh, 0, bx + bw/2, by + bh, bw);
+      glow.addColorStop(0, 'rgba(251,146,60,0.25)');
+      glow.addColorStop(1, 'transparent');
+      bCtx.fillStyle = glow;
+      bCtx.fillRect(bx + 5, liqY, bw - 10, bh - (liqY - by));
+    }
+  } else { // gas
+    // Vapor fill
+    const vGrd = bCtx.createLinearGradient(0, by, 0, by + bh);
+    vGrd.addColorStop(0, M.vc[0] + '18');
+    vGrd.addColorStop(1, M.vc[1] + '30');
+    bCtx.fillStyle = vGrd;
+    bCtx.fillRect(bx + 5, by + 5, bw - 10, bh - 10);
+  }
+}
+
+function drawCrystals(x, y, w, h, M) {
+  bCtx.save();
+  bCtx.strokeStyle = M.sc[0];
+  bCtx.lineWidth = 1;
+  const cols = Math.floor(w / 22), rows = Math.floor(h / 22);
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const cx = x + c * (w / cols) + (w / cols / 2);
+      const cy = y + r * (h / rows) + (h / rows / 2);
+      const sz = 6 + (c * r) % 4;
+      if (matKey === 'ice') {
+        // Snowflake
+        for (let a = 0; a < 6; a++) {
+          const ang = (a / 6) * Math.PI * 2;
+          bCtx.beginPath();
+          bCtx.moveTo(cx, cy);
+          bCtx.lineTo(cx + Math.cos(ang) * sz, cy + Math.sin(ang) * sz);
+          bCtx.stroke();
+        }
+      } else if (matKey === 'iron') {
+        // Metal lattice
+        bCtx.strokeStyle = 'rgba(148,163,184,0.25)';
+        bCtx.beginPath();
+        bCtx.moveTo(cx - sz, cy); bCtx.lineTo(cx + sz, cy);
+        bCtx.moveTo(cx, cy - sz); bCtx.lineTo(cx, cy + sz);
+        bCtx.stroke();
+      } else {
+        // Naphthalene: rectangle crystal
+        bCtx.strokeStyle = 'rgba(254,240,138,0.3)';
+        bCtx.beginPath();
+        bCtx.rect(cx - sz/2, cy - sz/3, sz, sz * 0.7);
+        bCtx.stroke();
+      }
+    }
+  }
+  bCtx.restore();
+}
+
+function drawParticle(p, M) {
+  bCtx.save();
+  bCtx.globalAlpha = Math.max(0, p.alpha);
+  if (p.type === 'bubble') {
+    bCtx.beginPath();
+    bCtx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+    bCtx.strokeStyle = M.sc[0];
+    bCtx.lineWidth = 1;
+    bCtx.stroke();
+    bCtx.fillStyle = M.vc[0] + '22';
+    bCtx.fill();
+  } else {
+    bCtx.beginPath();
+    bCtx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+    bCtx.fillStyle = M.vc[0];
+    bCtx.fill();
+  }
+  bCtx.restore();
+}
+
+function drawGlass(bx, by, bw, bh) {
+  bCtx.save();
+  // Main body
+  bCtx.beginPath();
+  bCtx.moveTo(bx + 12, by);
+  bCtx.lineTo(bx + bw - 12, by);
+  bCtx.lineTo(bx + bw, by + 20);
+  bCtx.lineTo(bx + bw, by + bh);
+  bCtx.lineTo(bx, by + bh);
+  bCtx.lineTo(bx, by + 20);
+  bCtx.closePath();
+  bCtx.strokeStyle = 'rgba(148,163,184,0.45)';
+  bCtx.lineWidth = 2;
+  bCtx.stroke();
+  // Glass sheen (left edge)
+  bCtx.beginPath();
+  bCtx.moveTo(bx + 10, by + 20);
+  bCtx.lineTo(bx + 10, by + bh - 10);
+  const shine = bCtx.createLinearGradient(bx + 5, 0, bx + 20, 0);
+  shine.addColorStop(0, 'rgba(255,255,255,0.12)');
+  shine.addColorStop(1, 'transparent');
+  bCtx.strokeStyle = shine;
+  bCtx.lineWidth = 6;
+  bCtx.stroke();
+  // Top rim
+  bCtx.beginPath();
+  bCtx.moveTo(bx - 6, by - 4);
+  bCtx.lineTo(bx + bw + 6, by - 4);
+  bCtx.strokeStyle = 'rgba(148,163,184,0.55)';
+  bCtx.lineWidth = 3;
+  bCtx.stroke();
+  // Scale markings
+  bCtx.setLineDash([2, 4]);
+  bCtx.strokeStyle = 'rgba(148,163,184,0.18)';
+  bCtx.lineWidth = 1;
+  for (let i = 1; i < 5; i++) {
+    const y = by + (i / 5) * bh;
+    bCtx.beginPath();
+    bCtx.moveTo(bx + bw - 22, y); bCtx.lineTo(bx + bw - 6, y); bCtx.stroke();
+  }
+  bCtx.setLineDash([]);
+  bCtx.restore();
+}
+
+function drawThermometer(tx, ty, th, T, M) {
+  const [minT, maxT] = M.range;
+  const ratio  = Math.max(0, Math.min(1, (T - minT) / (maxT - minT)));
+  const fillH  = (th - 28) * ratio;
+  const fillY  = ty + (th - 28) - fillH;
+  const col    = ratio < 0.5 ? lerpColor('#38bdf8','#34d399', ratio * 2)
+                              : lerpColor('#34d399','#ef4444', (ratio - 0.5) * 2);
+
+  bCtx.save();
+  // Tube background
+  bCtx.fillStyle = 'rgba(255,255,255,0.07)';
+  bCtx.beginPath();
+  bCtx.roundRect(tx + 3, ty, 10, th - 14, 5);
+  bCtx.fill();
+  bCtx.strokeStyle = 'rgba(148,163,184,0.3)';
+  bCtx.lineWidth = 1.5;
+  bCtx.stroke();
+
+  // Mercury fill
+  if (fillH > 0) {
+    const fGrd = bCtx.createLinearGradient(0, fillY + fillH, 0, fillY);
+    fGrd.addColorStop(0, col);
+    fGrd.addColorStop(1, col + '88');
+    bCtx.fillStyle = fGrd;
+    bCtx.beginPath();
+    bCtx.roundRect(tx + 4, fillY, 8, fillH + 4, [3, 3, 0, 0]);
+    bCtx.fill();
+  }
+
+  // Bulb
+  const bulbGrd = bCtx.createRadialGradient(tx + 7, ty + th - 5, 0, tx + 7, ty + th - 5, 10);
+  bulbGrd.addColorStop(0, col);
+  bulbGrd.addColorStop(1, col + '88');
+  bCtx.beginPath();
+  bCtx.arc(tx + 7, ty + th - 5, 10, 0, Math.PI * 2);
+  bCtx.fillStyle = bulbGrd;
+  bCtx.fill();
+  bCtx.strokeStyle = 'rgba(148,163,184,0.35)';
+  bCtx.lineWidth = 1.5;
+  bCtx.stroke();
+
+  // Key temperature markers
+  [M.melt, M.boil].forEach((tmark, idx) => {
+    const r2 = (tmark - minT) / (maxT - minT);
+    const my = ty + (th - 28) * (1 - r2);
+    if (my < ty || my > ty + th) return;
+    bCtx.beginPath();
+    bCtx.moveTo(tx - 2, my); bCtx.lineTo(tx + 16, my);
+    bCtx.strokeStyle = idx === 0 ? 'rgba(96,165,250,.7)' : 'rgba(248,113,113,.7)';
+    bCtx.lineWidth = 1.2;
+    bCtx.setLineDash([3, 3]); bCtx.stroke(); bCtx.setLineDash([]);
+    bCtx.font = '8px Space Grotesk'; bCtx.fillStyle = idx === 0 ? '#60a5fa' : '#f87171';
+    bCtx.textAlign = 'left';
+    bCtx.fillText(tmark + '°', tx + 18, my + 3);
+  });
+
+  bCtx.restore();
+}
+
+function drawDisplay(cx, cy, T, M) {
+  const txt = (T >= 0 ? '+' : '') + T.toFixed(1) + ' °C';
+  bCtx.save();
+  bCtx.font = 'bold 16px Courier New, monospace';
+  const tw = bCtx.measureText(txt).width;
+  bCtx.fillStyle = 'rgba(7,12,26,0.8)';
+  bCtx.beginPath();
+  bCtx.roundRect(cx - tw/2 - 10, cy - 13, tw + 20, 22, 7);
+  bCtx.fill();
+  bCtx.strokeStyle = 'rgba(148,163,184,0.15)';
+  bCtx.lineWidth = 1;
+  bCtx.stroke();
+  const ratio = Math.max(0, Math.min(1, (T - M.range[0]) / (M.range[1] - M.range[0])));
+  const col   = ratio < 0.5 ? lerpColor('#38bdf8','#34d399', ratio * 2)
+                             : lerpColor('#34d399','#ef4444', (ratio - 0.5) * 2);
+  bCtx.fillStyle = col;
+  bCtx.textAlign = 'center';
+  bCtx.fillText(txt, cx, cy + 3);
+  bCtx.restore();
+}
+
+/* ── DRAW GRAPH ──────────────────────────────────────── */
+function drawGraph() {
+  const M  = MAT[matKey];
+  const [minT, maxT] = M.range;
+  gCtx.clearRect(0, 0, GW, GH);
+
+  // Background
+  gCtx.fillStyle = 'rgba(0,0,0,0.25)';
+  gCtx.fillRect(0, 0, GW, GH);
+
+  if (tempHistory.length < 2) return;
+
+  const padL = 45, padR = 10, padT = 18, padB = 20;
+  const pw = GW - padL - padR;
+  const ph = GH - padT - padB;
+
+  const Gy = t => padT + ph - (Math.max(minT, Math.min(maxT, t)) - minT) / (maxT - minT) * ph;
+  const Gx = (i, len) => padL + (i / Math.max(1, len - 1)) * pw;
+
+  // Melting/boiling reference lines
+  gCtx.save();
+  [{ t: M.melt, col: '#60a5fa', lbl: 'Er. ' + M.melt + '°C' },
+   { t: M.boil, col: '#f87171', lbl: 'Kay. ' + M.boil + '°C' }].forEach(m => {
+    const y = Gy(m.t);
+    if (y < padT || y > padT + ph) return;
+    gCtx.setLineDash([4, 6]);
+    gCtx.strokeStyle = m.col + '50';
+    gCtx.lineWidth = 1;
+    gCtx.beginPath(); gCtx.moveTo(padL, y); gCtx.lineTo(GW - padR, y); gCtx.stroke();
+    gCtx.setLineDash([]);
+    gCtx.font = '8px Space Grotesk'; gCtx.fillStyle = m.col + 'aa';
+    gCtx.textAlign = 'right'; gCtx.fillText(m.lbl, padL - 2, y + 3);
+  });
+
+  // Y axis labels
+  gCtx.font = '8px Space Grotesk'; gCtx.fillStyle = 'rgba(100,116,139,0.7)';
+  gCtx.textAlign = 'right';
+  const ticks = 4;
+  for (let i = 0; i <= ticks; i++) {
+    const tv = minT + (i / ticks) * (maxT - minT);
+    const y  = Gy(tv);
+    gCtx.fillText(Math.round(tv) + '°', padL - 3, y + 3);
+  }
+
+  // Temperature curve
+  gCtx.beginPath();
+  tempHistory.forEach((p, i) => {
+    const x = Gx(i, tempHistory.length);
+    const y = Gy(p.T);
+    i === 0 ? gCtx.moveTo(x, y) : gCtx.lineTo(x, y);
+  });
+  // Stroke with gradient
+  const lineGrd = gCtx.createLinearGradient(padL, 0, padL + pw, 0);
+  lineGrd.addColorStop(0, M.css + '88');
+  lineGrd.addColorStop(1, M.css);
+  gCtx.strokeStyle = lineGrd;
+  gCtx.lineWidth = 2;
+  gCtx.lineJoin = 'round';
+  gCtx.stroke();
+
+  // Area under curve
+  gCtx.beginPath();
+  tempHistory.forEach((p, i) => {
+    const x = Gx(i, tempHistory.length);
+    const y = Gy(p.T);
+    i === 0 ? gCtx.moveTo(x, y) : gCtx.lineTo(x, y);
+  });
+  gCtx.lineTo(Gx(tempHistory.length - 1, tempHistory.length), padT + ph);
+  gCtx.lineTo(padL, padT + ph);
+  gCtx.closePath();
+  const areaGrd = gCtx.createLinearGradient(0, padT, 0, padT + ph);
+  areaGrd.addColorStop(0, M.css + '22');
+  areaGrd.addColorStop(1, 'transparent');
+  gCtx.fillStyle = areaGrd;
+  gCtx.fill();
+
+  gCtx.restore();
+}
+
+/* ── PHYSICS ─────────────────────────────────────────── */
+const SPEED = 12, BASE_RATE = 5, MAXT = 3200;
+function step(dt) {
+  if (paused) return;
+  const M    = MAT[matKey];
+  const oran = guc / 100;
+  const dT   = oran * BASE_RATE * SPEED * dt;
+
+  if (oran >= 0) {
+    if (phase === 'solid') {
+      if (T < M.melt) { T += dT; if (T > M.melt) T = M.melt; }
+      else if (pEr < 1) { pEr += Math.abs(oran) * dt * SPEED / 2; T = M.melt; }
+      else phase = 'liquid';
+    } else if (phase === 'liquid') {
+      if (T < M.boil) { T += dT; if (T > M.boil) T = M.boil; }
+      else if (pKay < 1) { pKay += Math.abs(oran) * dt * SPEED / 2; T = M.boil; }
+      else phase = 'gas';
+    } else {
+      T += dT * 0.6;
+    }
+  } else {
+    if (phase === 'gas') {
+      if (T > M.boil) { T += dT * 0.8; if (T < M.boil) T = M.boil; }
+      else if (pYog < 1) { pYog += Math.abs(oran) * dt * SPEED / 2; T = M.boil; }
+      else phase = 'liquid';
+    } else if (phase === 'liquid') {
+      if (T > M.melt) { T += dT; if (T < M.melt) T = M.melt; }
+      else if (pDon < 1) { pDon += Math.abs(oran) * dt * SPEED / 2; T = M.melt; }
+      else phase = 'solid';
+    } else {
+      T += dT * 0.6;
+    }
+  }
+
+  // Reveal table values
+  if (pEr > 0 && !revealed[matKey].m) { revealed[matKey].m = true; updateTable(); }
+  if (pKay > 0 && !revealed[matKey].b) { revealed[matKey].b = true; updateTable(); }
+
+  T = Math.max(-50, Math.min(MAXT, T));
+
+  // History
+  histTick++;
+  if (histTick % 4 === 0) {
+    tempHistory.push({ T, phase });
+    if (tempHistory.length > 400) tempHistory.shift();
+  }
+
+  updateReadouts();
+  updatePhaseBar();
+}
+
+/* ── UI UPDATES ──────────────────────────────────────── */
+function updateReadouts() {
+  const M = MAT[matKey];
+  document.getElementById('rTemp').textContent  = (T >= 0 ? '+' : '') + T.toFixed(1) + ' °C';
+  document.getElementById('rTemp').style.color  = T > M.boil - 10 ? '#f87171' : T > M.melt + 5 ? '#34d399' : '#38bdf8';
+  const phNames = { solid: 'Katı', liquid: 'Sıvı', gas: 'Gaz' };
+  document.getElementById('rPhase').textContent = phNames[phase];
+  document.getElementById('rPow').textContent   = (guc >= 0 ? '+' : '') + guc + '%';
+  document.getElementById('rPow').style.color   = guc > 0 ? '#fb923c' : guc < 0 ? '#38bdf8' : '#64748b';
+  const isPlat = (pEr > 0 && pEr < 1) || (pKay > 0 && pKay < 1) || (pDon > 0 && pDon < 1) || (pYog > 0 && pYog < 1);
+  document.getElementById('rPlat').textContent  = isPlat ? T.toFixed(0) + ' °C' : '—';
+  document.getElementById('rPlat').style.color  = isPlat ? '#fbbf24' : '#64748b';
+}
+
+function updatePhaseBar() {
+  const track = document.getElementById('pbarTrack');
+  track.innerHTML = `
+    <div class="pbar-seg" style="background:rgba(96,165,250,${phase==='solid'?'.7':'.2'})"></div>
+    <div class="pbar-seg" style="background:rgba(52,211,153,${phase==='liquid'?'.7':'.2'})"></div>
+    <div class="pbar-seg" style="background:rgba(248,113,113,${phase==='gas'?'.7':'.2'})"></div>
+  `;
+  const badge   = document.getElementById('phaseBadge');
+  const configs = {
+    solid:  { txt:'⬡ Katı',   bg:'rgba(96,165,250,.12)', col:'#93c5fd' },
+    liquid: { txt:'〜 Sıvı',  bg:'rgba(52,211,153,.12)', col:'#6ee7b7' },
+    gas:    { txt:'☁ Gaz',    bg:'rgba(248,113,113,.12)',col:'#fca5a5' }
+  };
+  const cfg = configs[phase];
+  badge.textContent = cfg.txt;
+  badge.style.background = cfg.bg;
+  badge.style.color = cfg.col;
+  // Plateau hint
+  const isPlat = (pEr > 0 && pEr < 1) || (pKay > 0 && pKay < 1) || (pDon > 0 && pDon < 1) || (pYog > 0 && pYog < 1);
+  if (isPlat) {
+    badge.textContent = '⏸ Plateau: ' + T.toFixed(0) + ' °C';
+    badge.style.background = 'rgba(251,191,36,.15)';
+    badge.style.color = '#fbbf24';
+  }
+}
+
+function updateTable() {
+  const tbody = document.getElementById('tblBody');
+  tbody.innerHTML = '';
+  Object.values(MAT).forEach(m => {
+    const tr = document.createElement('tr');
+    const hasM = revealed[m.id].m;
+    const hasB = revealed[m.id].b;
+    tr.innerHTML = `
+      <th style="text-align:left;color:${m.css}">${m.icon} ${m.name.split('(')[0].trim()}</th>
+      <td class="tval${hasM?' reveal':''}">${hasM ? m.melt + ' °C' : '?'}</td>
+      <td class="tval${hasB?' reveal':''}">${hasB ? m.boil + ' °C' : '?'}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+/* ── COLOR HELPER ────────────────────────────────────── */
+function lerpColor(a, b, t) {
+  const ah = a.slice(1), bh = b.slice(1);
+  const ar = [parseInt(ah.slice(0,2),16), parseInt(ah.slice(2,4),16), parseInt(ah.slice(4,6),16)];
+  const br = [parseInt(bh.slice(0,2),16), parseInt(bh.slice(2,4),16), parseInt(bh.slice(4,6),16)];
+  return '#' + ar.map((v,i) => Math.round(v + (br[i]-v)*t).toString(16).padStart(2,'0')).join('');
+}
+
+/* ── MATERIAL SETUP ──────────────────────────────────── */
+function setMaterial(key) {
+  matKey = key;
+  T      = MAT[key].start;
+  phase  = 'solid';
+  pEr = pKay = pDon = pYog = 0;
+  particles.length = 0;
+  tempHistory.length = 0;
+  histTick = 0;
+  document.querySelectorAll('.mat-card').forEach(c => c.classList.toggle('on', c.dataset.id === key));
+  updateReadouts();
+  updatePhaseBar();
+}
+
+/* ── BUILD SIDEBAR ───────────────────────────────────── */
+const matGrid = document.getElementById('matGrid');
+MAT_KEYS.forEach(key => {
+  const m = MAT[key];
+  const btn = document.createElement('div');
+  btn.className = 'mat-card' + (key === matKey ? ' on' : '');
+  btn.dataset.id = key;
+  btn.style.setProperty('--mc', m.css);
+  btn.innerHTML = `
+    <span class="mat-icon">${m.icon}</span>
+    <div>
+      <div class="mat-name">${m.name}</div>
+      <div class="mat-rng">${m.melt}°C · ${m.boil}°C</div>
+    </div>`;
+  matGrid.appendChild(btn);
+});
+matGrid.addEventListener('click', e => {
+  const c = e.target.closest('.mat-card');
+  if (c) setMaterial(c.dataset.id);
+});
+
+/* ── CONTROLS ────────────────────────────────────────── */
+document.getElementById('slPower').addEventListener('input', function() {
+  guc = parseInt(this.value);
+  document.getElementById('powerVal').textContent = (guc >= 0 ? '+' : '') + guc;
+  document.getElementById('powerVal').style.color = guc > 0 ? '#fb923c' : guc < 0 ? '#38bdf8' : '#64748b';
+});
+document.getElementById('btnPause').addEventListener('click', function() {
+  paused = !paused;
+  this.textContent = paused ? '▶ Sürdür' : '⏸ Durdur';
+});
+document.getElementById('btnReset').addEventListener('click', () => setMaterial(matKey));
+
+/* ── ANIMATION LOOP ──────────────────────────────────── */
+let prev = performance.now();
+function loop(now) {
+  const dt = Math.min(0.05, (now - prev) / 1000);
+  prev = now;
+  waveT += dt;
+
+  step(dt);
+  const M = MAT[matKey];
+  const bw = Math.min(200, BW * 0.35);
+  const bh = Math.min(280, BH * 0.68);
+  const bx = BW * 0.38 - bw / 2;
+  const by = (BH - bh) / 2 - 20;
+  updateParticles(dt, bx, by, bw, bh, M);
+  drawScene();
+  drawGraph();
+  requestAnimationFrame(loop);
+}
+
+/* ── INIT ────────────────────────────────────────────── */
+updateTable();
+setMaterial('ice');
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>

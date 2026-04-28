@@ -1,0 +1,693 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>3D Geometrik Cisimler — İnteraktif Simülasyon</title>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://unpkg.com/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #070c1a;
+      --surface:   rgba(255,255,255,0.04);
+      --surf2:     rgba(255,255,255,0.07);
+      --border:    rgba(255,255,255,0.08);
+      --text:      #e2e8f0;
+      --muted:     #64748b;
+      --radius:    14px;
+      --sidebar:   272px;
+    }
+
+    html, body {
+      height: 100%;
+      font-family: 'Space Grotesk', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      overflow: hidden;
+    }
+
+    /* ── LAYOUT ─────────────────────────────── */
+    .layout {
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+    }
+
+    /* ── HEADER ─────────────────────────────── */
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 0 20px;
+      height: 56px;
+      flex-shrink: 0;
+      background: rgba(7,12,26,0.92);
+      border-bottom: 1px solid var(--border);
+      backdrop-filter: blur(20px);
+      z-index: 20;
+    }
+
+    .header-brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .brand-icon {
+      width: 34px; height: 34px;
+      background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+      border-radius: 9px;
+      display: grid;
+      place-items: center;
+      font-size: 17px;
+      flex-shrink: 0;
+    }
+
+    .brand-text h1 { font-size: .92rem; font-weight: 700; line-height: 1.2; }
+    .brand-text p  { font-size: .68rem; color: var(--muted); }
+
+    .header-toggles {
+      display: flex;
+      gap: 6px;
+    }
+
+    .tgl {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      padding: 6px 13px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--muted);
+      font-family: inherit;
+      font-size: .75rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all .18s;
+      white-space: nowrap;
+      letter-spacing: .01em;
+    }
+    .tgl:hover  { background: var(--surf2); color: var(--text); }
+    .tgl.on     { background: rgba(99,102,241,.18); border-color: rgba(99,102,241,.55); color: #a5b4fc; }
+    .tgl .tgl-dot { width:7px; height:7px; border-radius:50%; background:currentColor; opacity:.7; }
+
+    /* ── BODY ───────────────────────────────── */
+    .body {
+      flex: 1;
+      display: flex;
+      overflow: hidden;
+    }
+
+    /* ── SIDEBAR ────────────────────────────── */
+    aside {
+      width: var(--sidebar);
+      flex-shrink: 0;
+      display: flex;
+      flex-direction: column;
+      border-right: 1px solid var(--border);
+      background: rgba(255,255,255,0.015);
+      overflow-y: auto;
+      overflow-x: hidden;
+    }
+
+    aside::-webkit-scrollbar { width: 4px; }
+    aside::-webkit-scrollbar-track { background: transparent; }
+    aside::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+    .s-sec {
+      padding: 16px;
+    }
+    .s-sec + .s-sec {
+      border-top: 1px solid var(--border);
+    }
+
+    .s-label {
+      font-size: .65rem;
+      font-weight: 700;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: .1em;
+      margin-bottom: 10px;
+    }
+
+    /* Shape buttons */
+    .shape-list {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+
+    .sbtn {
+      display: flex;
+      align-items: center;
+      gap: 11px;
+      padding: 11px 13px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 11px;
+      color: var(--muted);
+      font-family: inherit;
+      font-size: .84rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all .18s;
+      text-align: left;
+      width: 100%;
+    }
+    .sbtn:hover { background: var(--surf2); color: var(--text); }
+    .sbtn.on {
+      border-color: var(--c, #818cf8);
+      color: var(--c, #818cf8);
+      background: rgba(255,255,255,0.05);
+      box-shadow: 0 0 16px -6px var(--c, #818cf8);
+    }
+
+    .s-dot {
+      width: 9px; height: 9px;
+      border-radius: 50%;
+      background: var(--c, #64748b);
+      flex-shrink: 0;
+      transition: transform .2s;
+    }
+    .sbtn.on .s-dot { transform: scale(1.5); box-shadow: 0 0 6px var(--c, #818cf8); }
+
+    .s-sub {
+      font-size: .68rem;
+      color: var(--muted);
+      display: block;
+      margin-top: 1px;
+    }
+    .sbtn.on .s-sub { color: var(--c, #818cf8); opacity: .7; }
+
+    /* Info card */
+    .info-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 13px;
+      padding: 14px;
+    }
+
+    .ic-name {
+      font-size: 1.05rem;
+      font-weight: 700;
+      margin-bottom: 2px;
+      transition: color .25s;
+    }
+    .ic-type {
+      font-size: .7rem;
+      color: var(--muted);
+      margin-bottom: 13px;
+    }
+
+    .ic-formulas {
+      display: flex;
+      flex-direction: column;
+      gap: 7px;
+      margin-bottom: 12px;
+    }
+    .ic-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 10px;
+      background: rgba(0,0,0,0.25);
+      border-radius: 8px;
+      border: 1px solid var(--border);
+    }
+    .ic-flabel { font-size: .68rem; color: var(--muted); font-weight: 600; }
+    .ic-fval   {
+      font-size: .82rem;
+      font-weight: 700;
+      font-family: 'Courier New', monospace;
+      transition: color .25s;
+    }
+
+    .ic-props { display: flex; flex-wrap: wrap; gap: 5px; }
+    .ic-prop  {
+      font-size: .66rem;
+      padding: 3px 8px;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      color: var(--muted);
+    }
+
+    /* Scale buttons */
+    .scale-row { display: flex; gap: 7px; margin-bottom: 7px; }
+    .sc-btn {
+      flex: 1;
+      padding: 9px 6px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 9px;
+      color: var(--text);
+      font-family: inherit;
+      font-size: .82rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all .18s;
+    }
+    .sc-btn:hover { background: var(--surf2); }
+    .sc-btn.grow:hover   { border-color: #34d399; color: #34d399; }
+    .sc-btn.shrink:hover { border-color: #f87171; color: #f87171; }
+    .sc-reset {
+      width: 100%;
+      padding: 8px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 9px;
+      color: var(--muted);
+      font-family: inherit;
+      font-size: .76rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all .18s;
+    }
+    .sc-reset:hover { background: var(--surf2); color: var(--text); }
+
+    /* ── VIEWPORT ───────────────────────────── */
+    #vp {
+      flex: 1;
+      position: relative;
+      overflow: hidden;
+      background: radial-gradient(ellipse at 50% 35%, #0d1630 0%, #070c1a 100%);
+    }
+
+    .vp-badge {
+      position: absolute;
+      top: 16px;
+      left: 50%;
+      transform: translateX(-50%);
+      padding: 6px 18px;
+      background: rgba(7,12,26,0.72);
+      backdrop-filter: blur(14px);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      font-size: .83rem;
+      font-weight: 600;
+      color: var(--text);
+      pointer-events: none;
+      transition: all .3s;
+      z-index: 5;
+      white-space: nowrap;
+    }
+
+    .hint-bar {
+      position: absolute;
+      bottom: 16px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      gap: 18px;
+      padding: 7px 20px;
+      background: rgba(7,12,26,0.72);
+      backdrop-filter: blur(14px);
+      border: 1px solid var(--border);
+      border-radius: 24px;
+      font-size: .71rem;
+      color: var(--muted);
+      pointer-events: none;
+      z-index: 5;
+      white-space: nowrap;
+    }
+    .hint-bar span { display: flex; align-items: center; gap: 4px; }
+
+    /* ── MOBILE ─────────────────────────────── */
+    @media (max-width: 720px) {
+      aside {
+        width: 100%;
+        flex-direction: row;
+        border-right: none;
+        border-bottom: 1px solid var(--border);
+        overflow-x: auto;
+        overflow-y: hidden;
+        max-height: 68px;
+        flex-shrink: 0;
+        padding: 10px 12px;
+        gap: 8px;
+        align-items: center;
+        scrollbar-width: none;
+      }
+      aside::-webkit-scrollbar { display: none; }
+      .s-sec { display: contents; }
+      .s-label { display: none; }
+      .shape-list { flex-direction: row; gap: 6px; }
+      .sbtn {
+        flex-direction: row;
+        min-width: auto;
+        padding: 7px 12px;
+        font-size: .78rem;
+        white-space: nowrap;
+      }
+      .s-sub { display: none; }
+      /* Hide info & scale on mobile */
+      .s-sec:nth-child(2),
+      .s-sec:nth-child(3) { display: none; }
+
+      .body { flex-direction: column; }
+
+      .hint-bar { gap: 10px; font-size: .65rem; padding: 6px 14px; }
+      .tgl span:not(.tgl-dot) { display: none; }
+      .tgl { padding: 6px 10px; }
+
+      .header-toggles { gap: 4px; }
+    }
+  </style>
+</head>
+<body>
+<div class="layout">
+
+  <!-- HEADER -->
+  <header>
+    <div class="header-brand">
+      <div class="brand-icon">🔷</div>
+      <div class="brand-text">
+        <h1>3D Geometrik Cisimler</h1>
+        <p>İnteraktif Simülasyon</p>
+      </div>
+    </div>
+    <div class="header-toggles">
+      <button class="tgl on"  id="tRotate"><span class="tgl-dot"></span>Döndür</button>
+      <button class="tgl"     id="tWire">  <span class="tgl-dot"></span>Tel Kafes</button>
+      <button class="tgl"     id="tAxes">  <span class="tgl-dot"></span>Eksenler</button>
+    </div>
+  </header>
+
+  <div class="body">
+
+    <!-- SIDEBAR -->
+    <aside id="sidebar">
+      <div class="s-sec">
+        <div class="s-label">Cisim Seç</div>
+        <div class="shape-list" id="shapeList"></div>
+      </div>
+
+      <div class="s-sec">
+        <div class="s-label">Özellikler</div>
+        <div class="info-card">
+          <div class="ic-name" id="icName">—</div>
+          <div class="ic-type" id="icType">3 Boyutlu Cisim</div>
+          <div class="ic-formulas" id="icFormulas"></div>
+          <div class="ic-props"   id="icProps"></div>
+        </div>
+      </div>
+
+      <div class="s-sec">
+        <div class="s-label">Boyut</div>
+        <div class="scale-row">
+          <button class="sc-btn grow"   id="scUp">＋ Büyüt</button>
+          <button class="sc-btn shrink" id="scDn">－ Küçült</button>
+        </div>
+        <button class="sc-reset" id="scReset">↺ Görünümü Sıfırla</button>
+      </div>
+    </aside>
+
+    <!-- 3D VIEWPORT -->
+    <main id="vp">
+      <div class="vp-badge" id="vpBadge">Küp</div>
+      <div class="hint-bar">
+        <span>🖱 Sürükle: Döndür</span>
+        <span>⇧ Sağ Tık: Kaydır</span>
+        <span>⚙ Tekerlek: Zoom</span>
+      </div>
+    </main>
+
+  </div>
+</div>
+
+<script>
+/* ── SHAPE DATA ──────────────────────────────────────── */
+const SHAPES = {
+  box: {
+    name: 'Küp', type: 'Kare Prizma',
+    css: '#818cf8', hex: 0x818cf8,
+    formulas: [{ l: 'Hacim', v: 'V = a³' }, { l: 'Yüzey Alanı', v: 'A = 6a²' }],
+    props: ['6 yüz', '8 köşe', '12 kenar', 'Tüm yüzler kare'],
+    geo: () => new THREE.BoxGeometry(2, 2, 2)
+  },
+  cylinder: {
+    name: 'Silindir', type: 'Dönel Cisim',
+    css: '#22d3ee', hex: 0x22d3ee,
+    formulas: [{ l: 'Hacim', v: 'V = πr²h' }, { l: 'Yüzey Alanı', v: 'A = 2πr(r+h)' }],
+    props: ['2 daire yüz', '1 yanal yüz', 'Sonsuz simetri ekseni'],
+    geo: () => new THREE.CylinderGeometry(1, 1, 2.5, 64)
+  },
+  prism: {
+    name: 'Dikdörtgen Prizma', type: 'Prizma',
+    css: '#a78bfa', hex: 0xa78bfa,
+    formulas: [{ l: 'Hacim', v: 'V = a·b·c' }, { l: 'Yüzey Alanı', v: 'A = 2(ab+bc+ca)' }],
+    props: ['6 dikdörtgen yüz', '8 köşe', '12 kenar'],
+    geo: () => new THREE.BoxGeometry(3, 1.4, 1.4)
+  },
+  cone: {
+    name: 'Koni', type: 'Dönel Cisim',
+    css: '#fb923c', hex: 0xfb923c,
+    formulas: [{ l: 'Hacim', v: 'V = ⅓πr²h' }, { l: 'Yüzey Alanı', v: 'A = πr(r+l)' }],
+    props: ['1 daire taban', '1 yanal yüz', '1 tepe noktası'],
+    geo: () => new THREE.ConeGeometry(1.2, 2.6, 64)
+  },
+  sphere: {
+    name: 'Küre', type: 'Dönel Cisim',
+    css: '#34d399', hex: 0x34d399,
+    formulas: [{ l: 'Hacim', v: 'V = 4/3·πr³' }, { l: 'Yüzey Alanı', v: 'A = 4πr²' }],
+    props: ['Sonsuz simetri ekseni', 'Tüm noktalar eşit uzaklıkta'],
+    geo: () => new THREE.SphereGeometry(1.5, 64, 64)
+  },
+  triPrism: {
+    name: 'Üçgen Prizma', type: 'Prizma',
+    css: '#f472b6', hex: 0xf472b6,
+    formulas: [{ l: 'Hacim', v: 'V = (√3/4)a²h' }, { l: 'Yüzey Alanı', v: 'A = 3ah + (√3/2)a²' }],
+    props: ['2 üçgen yüz', '3 dikdörtgen yüz', '6 köşe', '9 kenar'],
+    geo: () => new THREE.CylinderGeometry(1.2, 1.2, 2.5, 3)
+  },
+  pyramid: {
+    name: 'Kare Piramit', type: 'Piramit',
+    css: '#fbbf24', hex: 0xfbbf24,
+    formulas: [{ l: 'Hacim', v: 'V = ⅓a²h' }, { l: 'Yüzey Alanı', v: 'A = a² + 2al' }],
+    props: ['1 kare taban', '4 üçgen yüz', '5 köşe', '8 kenar'],
+    geo: () => new THREE.ConeGeometry(1.5, 2.6, 4)
+  }
+};
+
+/* ── BUILD SIDEBAR BUTTONS ───────────────────────────── */
+const shapeList = document.getElementById('shapeList');
+Object.entries(SHAPES).forEach(([key, s]) => {
+  const btn = document.createElement('button');
+  btn.className = 'sbtn';
+  btn.dataset.key = key;
+  btn.style.setProperty('--c', s.css);
+  btn.innerHTML = `<span class="s-dot"></span><span>${s.name}<span class="s-sub">${s.type}</span></span>`;
+  shapeList.appendChild(btn);
+});
+
+/* ── THREE.JS ────────────────────────────────────────── */
+let scene, camera, renderer, controls;
+let mesh = null, edgeLines = null;
+let axesH = null, gridH = null;
+let autoRotate = true, wireframe = false, axes = false;
+let enterProg = 1; // shape-in animation
+
+const vp = document.getElementById('vp');
+
+function init() {
+  scene = new THREE.Scene();
+
+  camera = new THREE.PerspectiveCamera(52, vp.clientWidth / vp.clientHeight, 0.1, 200);
+  camera.position.set(0, 1.8, 6.5);
+
+  renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.setSize(vp.clientWidth, vp.clientHeight);
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  Object.assign(renderer.domElement.style, { position:'absolute', top:0, left:0 });
+  vp.insertBefore(renderer.domElement, vp.firstChild);
+
+  /* Lights */
+  scene.add(new THREE.AmbientLight(0xffffff, 0.38));
+
+  const sun = new THREE.DirectionalLight(0xffffff, 0.85);
+  sun.position.set(5, 9, 6);
+  sun.castShadow = true;
+  scene.add(sun);
+
+  const fill = new THREE.DirectionalLight(0x7ba4ff, 0.28);
+  fill.position.set(-6, -3, -4);
+  scene.add(fill);
+
+  const rim = new THREE.PointLight(0x818cf8, 0.6, 18);
+  rim.position.set(-4, 4, -5);
+  scene.add(rim);
+
+  /* Helpers */
+  gridH = new THREE.GridHelper(12, 24, 0x1e293b, 0x151f32);
+  gridH.position.y = -2.2;
+  gridH.visible = false;
+  scene.add(gridH);
+
+  axesH = new THREE.AxesHelper(3.5);
+  axesH.visible = false;
+  scene.add(axesH);
+
+  /* Controls */
+  controls = new THREE.OrbitControls(camera, renderer.domElement);
+  controls.enableDamping  = true;
+  controls.dampingFactor  = 0.07;
+  controls.minDistance    = 2.5;
+  controls.maxDistance    = 14;
+  controls.autoRotate     = true;
+  controls.autoRotateSpeed = 1.4;
+
+  loadShape('box');
+  document.querySelector('.sbtn').classList.add('on');
+
+  window.addEventListener('resize', onResize);
+  animate();
+}
+
+/* ── LOAD SHAPE ──────────────────────────────────────── */
+function loadShape(key) {
+  const s = SHAPES[key];
+
+  if (mesh) {
+    scene.remove(mesh);
+    mesh.geometry.dispose();
+    mesh.material.dispose();
+    if (edgeLines) {
+      mesh.remove(edgeLines);
+      edgeLines.geometry.dispose();
+      edgeLines.material.dispose();
+    }
+  }
+
+  const geo = s.geo();
+  const mat = new THREE.MeshStandardMaterial({
+    color: s.hex, metalness: 0.18, roughness: 0.42,
+    wireframe: wireframe
+  });
+  mesh = new THREE.Mesh(geo, mat);
+  mesh.castShadow = true;
+  mesh.userData.userScale = 1;
+
+  /* Edge outline as child */
+  const eGeo = new THREE.EdgesGeometry(geo, 12);
+  const eMat = new THREE.LineBasicMaterial({ color: s.hex, transparent: true, opacity: 0.55 });
+  edgeLines = new THREE.LineSegments(eGeo, eMat);
+  edgeLines.visible = !wireframe;
+  mesh.add(edgeLines);
+
+  scene.add(mesh);
+
+  /* Pop-in animation */
+  enterProg = 0;
+
+  updateInfo(key);
+  document.getElementById('vpBadge').textContent = s.name;
+}
+
+/* ── UPDATE INFO PANEL ───────────────────────────────── */
+function updateInfo(key) {
+  const s = SHAPES[key];
+  const name = document.getElementById('icName');
+  name.textContent = s.name;
+  name.style.color = s.css;
+
+  document.getElementById('icType').textContent = s.type;
+
+  document.getElementById('icFormulas').innerHTML = s.formulas.map(f =>
+    `<div class="ic-row">
+       <span class="ic-flabel">${f.l}</span>
+       <span class="ic-fval" style="color:${s.css}">${f.v}</span>
+     </div>`
+  ).join('');
+
+  document.getElementById('icProps').innerHTML = s.props.map(p =>
+    `<span class="ic-prop">${p}</span>`
+  ).join('');
+}
+
+/* ── ANIMATE ─────────────────────────────────────────── */
+function animate() {
+  requestAnimationFrame(animate);
+  controls.update();
+
+  /* Shape entry animation (ease-out cubic) */
+  if (enterProg < 1 && mesh) {
+    enterProg = Math.min(1, enterProg + 0.07);
+    const e = 1 - Math.pow(1 - enterProg, 3);
+    const us = mesh.userData.userScale || 1;
+    mesh.scale.setScalar(e * us);
+  }
+
+  renderer.render(scene, camera);
+}
+
+/* ── RESIZE ──────────────────────────────────────────── */
+function onResize() {
+  camera.aspect = vp.clientWidth / vp.clientHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(vp.clientWidth, vp.clientHeight);
+}
+
+/* ── SHAPE SELECTOR ──────────────────────────────────── */
+document.getElementById('shapeList').addEventListener('click', e => {
+  const btn = e.target.closest('.sbtn');
+  if (!btn) return;
+  document.querySelectorAll('.sbtn').forEach(b => b.classList.remove('on'));
+  btn.classList.add('on');
+  loadShape(btn.dataset.key);
+});
+
+/* ── TOGGLES ─────────────────────────────────────────── */
+document.getElementById('tRotate').addEventListener('click', function() {
+  autoRotate = !autoRotate;
+  this.classList.toggle('on', autoRotate);
+  controls.autoRotate = autoRotate;
+});
+
+document.getElementById('tWire').addEventListener('click', function() {
+  wireframe = !wireframe;
+  this.classList.toggle('on', wireframe);
+  if (mesh) mesh.material.wireframe = wireframe;
+  if (edgeLines) edgeLines.visible = !wireframe;
+});
+
+document.getElementById('tAxes').addEventListener('click', function() {
+  axes = !axes;
+  this.classList.toggle('on', axes);
+  axesH.visible = axes;
+  gridH.visible = axes;
+});
+
+/* ── SCALE ───────────────────────────────────────────── */
+document.getElementById('scUp').addEventListener('click', () => {
+  if (!mesh) return;
+  mesh.userData.userScale = (mesh.userData.userScale || 1) * 1.13;
+  mesh.scale.setScalar(mesh.userData.userScale);
+});
+document.getElementById('scDn').addEventListener('click', () => {
+  if (!mesh) return;
+  mesh.userData.userScale = (mesh.userData.userScale || 1) / 1.13;
+  mesh.scale.setScalar(mesh.userData.userScale);
+});
+document.getElementById('scReset').addEventListener('click', () => {
+  camera.position.set(0, 1.8, 6.5);
+  camera.lookAt(0, 0, 0);
+  controls.target.set(0, 0, 0);
+  controls.update();
+  if (mesh) {
+    mesh.userData.userScale = 1;
+    mesh.scale.set(1, 1, 1);
+  }
+});
+
+/* ── START ───────────────────────────────────────────── */
+init();
+</script>
+</body>
+</html>
